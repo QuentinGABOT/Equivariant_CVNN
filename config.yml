@@ -1,0 +1,129 @@
+data:
+  batch_size: 128
+  #batch_size: 64
+  #crop:
+    #end_col: 3200
+    #end_row: 7500
+    #start_col: 1000
+    #start_row: 3000
+  dataset:
+    #name: MSTAR
+    #trainpath: ../datasets/MSTAR
+    #name: Bretigny
+    #trainpath: ../datasets/Bretigny
+    #name: ALOSDataset
+    #name: PolSFDataset
+    #trainpath: ../datasets/SAN_FRANCISCO_ALOS2
+    #name: S1SLC
+    #trainpath: ../datasets/S1SLC
+    name: 2Shapes
+    trainpath: ../datasets/2Shapes
+    #name: 3Shapes
+    #trainpath: ../datasets/3Shapes
+    #name: MNIST_Shape
+    #trainpath: ../datasets/MNIST_Shape
+  #transform: LogAmplitudeTransform, AmplitudeTransform
+  #transform: LogAmplitudeTransform, RealImaginaryTransform
+  #transform: LogAmplitudeTransform
+  transform: ZeroPhaseTransform
+  #img_size: 54
+  #img_stride: 54
+  #img_size: 64
+  #img_stride: 64
+  img_size: 16
+  img_stride: 16
+  num_workers: 4
+  valid_ratio: 0.2
+  test_ratio: 0.2
+logging:
+  logdir: ./logs
+  wandb:
+    #project: runs_paper_complex_lps
+    project: TEST
+    #project: bio_cvnn
+loss:
+  kld_weight: 1
+  #name: FocalLoss
+  gamma: 5
+  #name: ComplexMSELoss
+  name: MSELoss
+model:
+  #activation: ReLU
+  activation: modReLU
+  #channels_ratio: 16
+  channels_ratio: 32
+  #class: UNetResEquivariant
+  #class: UNet
+  class: AutoEncoderWD
+  #class: ResNetAttentionEquivariant
+  #class: AutoEncoderWDRes
+  res: true
+  projection:
+    class: ModCtoR
+    #class: NoCtoR
+    #class: PolyCtoR
+    #class: MLPCtoR
+    #global: false
+    global: true
+    #softmax: SoftmaxMeanCtoR
+    #softmax: SoftmaxProductCtoR
+    softmax: Softmax
+  downsampling: MaxPool
+  #downsampling: Null
+  #downsampling: AvgPool
+  #downsampling: LPD
+  #downsampling: APS
+  #downsampling: LPF
+  upsampling: Upsample
+  #upsampling: Null
+  #upsampling: ConvTranspose
+  #upsampling: LPU
+  latent_dim: 8192
+  dropout : 0.25
+  normalization: BatchNorm
+  #normalization: LayerNorm
+  #num_layers: 4
+  num_layers: 4
+  gumbel_tau:
+    start_value: 10
+    gamma: 0.1
+    start_decay_epoch: 10
+    min_value: 0.00001
+nepochs: 150
+optim:
+  algo: AdamW
+  params:
+    lr: 0.005
+    weight_decay: 0.005
+scheduler:
+  algo: StepLR
+  params:
+    step_size: 5
+    gamma: 0.9
+  #algo: ReduceLROnPlateau
+  #params:
+    #mode: min
+    #factor: 0.5
+    #patience: 5
+    #min_lr: 0.0005
+  #algo: CyclicLR
+  #params:
+    #base_lr: 0.0001
+    #max_lr: 0.001
+    #step_size_up: 100
+    #mode: triangular
+  #algo: OneCycleLR
+  #params:
+    #max_lr: 0.001
+  #algo: CosineAnnealingLR
+  #params:
+    #eta_min: 0.00005
+  #algo: CosineAnnealingWarmRestarts
+  #params:
+    #T_0: 10
+    #T_mult: 1
+    #eta_min: 0.0001
+pretrained: false
+world_size: 4
+dtype: complex64
+#dtype: float64
