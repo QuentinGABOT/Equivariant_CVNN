@@ -24,7 +24,6 @@ import plotly.express as px
 MIN_VALUE = 0.02
 MAX_VALUE = 40
 
-
 def pauli_transform(sar_img: np.ndarray) -> np.ndarray:
     """
     Perform Pauli decomposition on the SAR image.
@@ -598,83 +597,6 @@ def assign_h_alpha_class(h: float, alpha: float) -> int:
             return 1
 
 
-def show_images(
-    ground_truth: list,
-    predicted: list,
-    image_path: str,
-    task: str,
-    metrics: dict = None,
-    last: bool = False,
-    test: bool = False,
-    number_classes: int = None,
-    ignore_index: int = -100,
-    test_mask=None,
-    config: dict = None,
-    wandb_log=None,
-    is_mnist=False,
-) -> None:
-    """
-    Display images for ground truth and predictions.
-    """
-    num_samples = len(ground_truth)
-    if task == "reconstruction" and not is_mnist:
-        num_channels = ground_truth[0].shape[0]
-    else:
-        num_channels = None
-
-    ncols = calculate_ncols(task, test, last, num_channels, test_mask, is_mnist)
-
-    fig, axes = plt.subplots(
-        num_samples,
-        ncols,
-        figsize=(5 * ncols, 5 * num_samples),
-        constrained_layout=True,
-    )
-    axes = np.atleast_2d(axes)
-    res = None
-
-    for i in range(num_samples):  # rework cette partie
-
-        idx = 0
-        g_t = np.copy(ground_truth[i])
-        pred = np.copy(predicted[i])
-        if test_mask is not None:
-            test_mask = np.copy(test_mask[i])
-
-        if task == "segmentation":
-            res = plot_segmentation_images(
-                g_t, pred, axes, i, idx, number_classes, ignore_index, test, test_mask
-            )
-        elif task == "reconstruction":
-            if is_mnist:
-                res = plot_reconstruction_mnist_images(g_t, pred, axes, i, idx, test)
-            else:
-                res = plot_reconstruction_polsar_images(
-                    g_t, pred, axes, i, idx, test, last, num_channels
-                )
-        elif task == "classification":
-            res = plot_classification_images(
-                g_t, pred, axes, i, idx, number_classes, ignore_index, test
-            )
-
-    plt.savefig(image_path, bbox_inches="tight", pad_inches=0)
-    plt.close()
-
-    if test:
-        metrics.update(res)
-        metrics["Task"] = task
-        if wandb_log:
-            wandb.log(metrics)
-            wandb.log({"test_image": [wandb.Image(fig, caption="Test Image")]})
-        else:
-            log_model_performance(
-                hyperparameters=config,
-                metrics=metrics,
-                excel_file_path=config["logging"]["wandb"]["project"] + ".xlsx",
-                task=task,
-            )
-
-
 def calculate_ncols(
     task: str,
     test: bool,
@@ -709,24 +631,7 @@ def plot_segmentation_images(
     ignore_index: int = None,
     sets_masks: np.ndarray = None,
 ) -> None:
-    """
-    Plots segmentation images with an optional test mask overlay to indicate dataset splits.
 
-    Args:
-        to_be_visualized (list): Array of shape (N, 3, H, W), where:
-                                       - First channel: Ground truth.
-                                       - Second channel: Prediction.
-                                       - Third channel: Original image (optional).
-        confusion_matrix (np.ndarray): Confusion matrix of shape (number_classes, number_classes).
-        number_classes (int): Number of classes for segmentation.
-        logdir (str): Directory to save the plot.
-        wandb_log (bool): Whether to log the plot to Weights & Biases.
-        ignore_index (int, optional): Value in the ground truth to be ignored in the masked prediction.
-        sets_masks (np.ndarray, optional): Array of shape (N, H, W) with integer values indicating dataset splits:
-                                           - 1: Train
-                                           - 2: Validation
-                                           - 3: Test
-    """
     # Define colormap for segmentation classes
     class_colors = {
         7: {
@@ -968,9 +873,14 @@ def plot_synchrony_images(
 
     for i in range(num_samples):
         # Extract ground truth, prediction, and image
-        g_t = to_be_visualized[i][0]
-        pred = to_be_visualized[i][1]
-        img = to_be_visualized[i][2]
+        g_t = torch.abs(to_be_visualized[i][0]).cpu().numpy()  # to discard the phase
+        pred = to_be_visualized[i][1].cpu().numpy()
+        img = to_be_visualized[i][2]  # already in numpy
+
+        rnd = np.random.randint(0, len(img))
+        img = img[rnd]
+        g_t = g_t[rnd].squeeze()
+        pred = pred[rnd]
 
         # Plot Ground Truth
         axes[i][0].imshow(g_t, cmap="viridis")
@@ -1003,15 +913,6 @@ def plot_reconstruction_polsar_images(
     logdir: str,
     wandb_log: bool,
 ) -> None:
-    """
-    Plot reconstruction images for PolSAR data, including amplitude, angular distance,
-    histograms, H-alpha decomposition, and confusion matrix.
-
-    Args:
-        to_be_visualized (list): List of samples with ground truth and predicted images.
-        num_channels (int): Number of channels in the PolSAR images.
-        confusion_matrix (np.ndarray): Confusion matrix for H-alpha classification.
-    """
     num_samples = to_be_visualized.shape[0]  # Number of samples
     ncols = 12  # Number of plots per sample
     fig, axes = plt.subplots(
@@ -1289,410 +1190,125 @@ def plot_latent_features(
     labels,
     path,
     wandb_log,
-    ignore_index=-100,
+    ignore_index,
     n_components=2,
     sample_size=5000,
 ):
-    """
-    Processes latent features and labels, determines if labels are 1D or 2D, handles dual-real-valued tensors,
-    and visualizes the latent space.
-
-    Parameters:
-    - latent_features_list: List of latent feature arrays collected during inference.
-    - labels_list: List of label arrays corresponding to the latent features.
-    - n_components: Number of components for dimensionality reduction (default=2).
-    - sample_size: Number of samples/pixels to use for visualization (default=100000).
-    - path: Path object where the HTML file will be saved.
-    - wandb_log: Boolean indicating whether to log the visualization to Weights & Biases.
-    - ignore_index: Label value to ignore (default=-100).
-
-    Returns:
-    - None (saves an interactive HTML plot of the latent space visualization).
-    """
-    # Concatenate latent features
-    # latent_features = np.concatenate(latent_features_list, axis=0)
-
-    # Handle dual-real-valued tensors by merging the last dimension into channels
-    if latent_features.ndim == 5 and latent_features.shape[-1] == 2:
-        # Merge the last dimension (real and imaginary) into the channel dimension
-        batch_size, channels, height, width, dual = latent_features.shape
-        latent_features = latent_features.reshape(
-            batch_size, channels * dual, height, width
+    if len(labels.shape) == 3:
+        latent_features, labels = extract_pixel_wise_features(
+            latent_features, labels, ignore_index
         )
-        print(
-            f"Latent_features reshaped to merge real and imaginary parts: {latent_features.shape}"
-        )
-    else:
-        print("No dual-real-valued dimension detected or already handled.")
+    latent_features, labels = sampling(latent_features, labels, sample_size)
 
-    # Concatenate and squeeze labels
-    # labels = np.concatenate(labels_list, axis=0)
-    # labels = np.squeeze(labels)
+    # Determine number of classes
+    unique_labels = np.unique(labels)
+    number_classes = len(unique_labels)
+    print(f"Number of classes: {number_classes}")
 
-    # Determine if labels are 1D or 2D
-    labels_sample = labels[0]
+    class_colors = assign_colors(unique_labels, number_classes)
 
-    if labels_sample.ndim == 1:
-        # Case 1: Labels are 1D (classification labels)
-        print("Labels are 1D (classification labels).")
-        # ground_truth is the concatenated labels
-        ground_truth = labels
-        print("Shape of ground_truth after concatenation:", ground_truth.shape)
+    # Process latent features
+    latent_features_processed = process_latent_features(latent_features)
 
-        # Determine number of classes
-        unique_labels = np.unique(ground_truth)
-        number_classes = len(unique_labels)
-        print(f"Number of classes: {number_classes}")
+    visualize_latent_space(
+        latent_features_processed,
+        labels,
+        n_components,
+        path,
+        wandb_log,
+        class_colors,
+    )
 
-        # Define class_colors based on number_classes
-        class_colors_dict = {
-            8: {
-                0: "black",
-                1: "purple",
-                2: "blue",
-                3: "green",
-                4: "red",
-                5: "cyan",
-                6: "yellow",
-                7: "orange",
-            }
-        }
-        class_colors = class_colors_dict.get(number_classes, {})
-        if not class_colors:
-            print(
-                f"No predefined color mapping for {number_classes} classes. Using default colors."
-            )
-            # Assign default colors if mapping is not defined
-            unique_labels_sorted = sorted(unique_labels)
-            default_colors = px.colors.qualitative.Plotly
-            if number_classes > len(default_colors):
-                # Repeat colors if not enough
-                default_colors *= number_classes // len(default_colors) + 1
-            class_colors = {
-                label: color
-                for label, color in zip(
-                    unique_labels_sorted, default_colors[:number_classes]
-                )
-            }
-        else:
-            print(f"Using predefined color mapping for {number_classes} classes.")
 
-        # Check that all labels have a color defined
-        missing_colors = set(unique_labels) - set(class_colors.keys())
-        if missing_colors:
-            raise ValueError(f"Missing colors for labels: {missing_colors}")
-
-        # Process latent features
-        latent_features_processed = process_latent_features(latent_features)
-
-        # Proceed with visualization
-        visualize_latent_space(
-            latent_features_processed,
-            ground_truth,
-            n_components,
-            path,
-            wandb_log,
-            class_colors,
-        )
-
-    elif labels_sample.ndim == 2:
-        # Case 2: Labels are 2D (segmentation masks)
-        print("Labels are 2D (segmentation masks).")
-        # Process pixel-wise features and labels
-        pixel_features, pixel_labels = process_pixel_wise_features(
-            latent_features, labels, sample_size
-        )
-
-        # Discard unclassified pixels (e.g., label value == 0)
-        classified_indices = pixel_labels != ignore_index
-        pixel_features = pixel_features[classified_indices]
-        pixel_labels = pixel_labels[classified_indices]
-        print(f"Number of classified pixels: {pixel_features.shape[0]}")
-
-        # Determine number of classes
-        unique_labels = np.unique(pixel_labels)
-        number_classes = len(unique_labels)
-        print(f"Number of classes: {number_classes}")
-
-        # Define class_colors based on number_classes
-        class_colors_dict = {
-            6: {
-                1: "purple",
-                2: "blue",
-                3: "green",
-                4: "red",
-                5: "cyan",
-                6: "yellow",
-            },
-            4: {
-                1: "green",
-                2: "brown",
-                3: "blue",
-                4: "yellow",
-            },
-            7: {
-                1: "green",
-                2: "cyan",
-                3: "red",
-                4: "purple",
-                5: "orange",
-                6: "yellow",
-                7: "blue",
-            },
-        }
-        class_colors = class_colors_dict.get(number_classes, {})
-        if not class_colors:
-            print(
-                f"No predefined color mapping for {number_classes} classes. Using default colors."
-            )
-            # Assign default colors if mapping is not defined
-            unique_labels_sorted = sorted(unique_labels)
-            default_colors = px.colors.qualitative.Plotly
-            if number_classes > len(default_colors):
-                # Repeat colors if not enough
-                default_colors *= number_classes // len(default_colors) + 1
-            class_colors = {
-                label: color
-                for label, color in zip(
-                    unique_labels_sorted, default_colors[:number_classes]
-                )
-            }
-        else:
-            print(f"Using predefined color mapping for {number_classes} classes.")
-
-        # Check that all labels have a color defined
-        missing_colors = set(unique_labels) - set(class_colors.keys())
-        if missing_colors:
-            raise ValueError(f"Missing colors for labels: {missing_colors}")
-
-        # Proceed with visualization
-        visualize_latent_space(
-            pixel_features, pixel_labels, n_components, path, wandb_log, class_colors
-        )
-
-    else:
-        raise ValueError("Labels have unsupported number of dimensions.")
+def sampling(latent_features, labels, sample_size):
+    sample_size = min(len(labels), sample_size)
+    indices = np.random.choice(len(labels), size=sample_size, replace=False)
+    features_sampled = latent_features[indices]
+    labels_sampled = labels[indices]
+    return features_sampled, labels_sampled
 
 
 def process_latent_features(latent_features):
-    """
-    Processes latent features by reshaping and normalizing.
-
-    Parameters:
-    - latent_features: NumPy array of latent features.
-
-    Returns:
-    - processed_features: Normalized features.
-    """
-    print("Shape of latent_features before processing:", latent_features.shape)
-
-    # Ensure latent_features has at least 2 dimensions
-    if latent_features.ndim == 1:
-        # Add sample dimension
-        latent_features = np.expand_dims(latent_features, axis=0)
-        print(f"Added sample dimension: {latent_features.shape}")
-    elif latent_features.ndim == 3:
-        # If dimensions are (channels, height, width), add batch dimension
-        latent_features = np.expand_dims(latent_features, axis=0)
-        print(f"Added batch dimension: {latent_features.shape}")
-    elif latent_features.ndim == 4 and latent_features.shape[0] == 1:
-        # Batch size is 1, keep as is
-        pass
-    else:
-        # Other cases, keep as is
-        pass
-
-    # Now latent_features should have shape (n_samples, channels, height, width) or (n_samples, features)
-    n_samples = latent_features.shape[1]
-
-    # If latent_features has more than 2 dimensions, flatten the rest
-    if latent_features.ndim > 2:
-        # Flatten the features
-        latent_features = latent_features.reshape(n_samples, -1)
-        print("Shape after reshaping latent_features:", latent_features.shape)
-
-    # Normalize features
     scaler = StandardScaler()
     latent_features_normalized = scaler.fit_transform(latent_features)
-    print("Shape after normalization:", latent_features_normalized.shape)
-
     return latent_features_normalized
 
 
-def process_pixel_wise_features(latent_features_list, labels_list, sample_size):
-    """
-    Processes pixel-wise features and labels for segmentation masks.
+def process_pixel_wise_features(latent_features, labels, sample_size, ignore_index):
 
-    Parameters:
-    - latent_features_list: List of latent feature arrays.
-    - labels_list: List of label arrays.
-    - sample_size: Number of pixels to sample.
+    B, C, H, W = latent_features.shape
+    latent_features = latent_features.permute(0, 2, 3, 1).reshape(-1, C).cpu().numpy()
+    labels = labels.view(-1).cpu().numpy()
 
-    Returns:
-    - pixel_features_normalized: Normalized pixel-wise features.
-    - pixel_labels_sampled: Corresponding pixel labels.
-    """
-    pixel_features = []
-    pixel_labels = []
+    valid_indices = labels != ignore_index
+    pixel_features = latent_features[valid_indices, :]
+    pixel_labels = labels[valid_indices]
 
-    for idx, (features_batch, labels_batch) in enumerate(
-        zip(latent_features_list, labels_list)
-    ):
-        print(f"Processing batch {idx+1}/{len(latent_features_list)}")
-
-        # Get batch size and dimensions
-        channels, height, width = features_batch.shape
-
-        # Reshape features and labels
-        features_flat = features_batch.reshape(channels, -1)  # (channels, num_pixels)
-        labels_flat = labels_batch.reshape(-1)  # (num_pixels)
-
-        # Transpose features to (num_pixels, channels)
-        features_flat = features_flat.transpose(1, 0)
-
-        pixel_features.append(features_flat)  # (num_pixels, channels)
-        pixel_labels.append(labels_flat)  # (num_pixels,)
-
-    # Concatenate all data
-    pixel_features = np.concatenate(pixel_features, axis=0)  # (total_pixels, channels)
-    pixel_labels = np.concatenate(pixel_labels, axis=0)  # (total_pixels,)
-    print("Total number of pixels:", pixel_features.shape[0])
-
-    # Subsample pixels
-    num_pixels = pixel_features.shape[0]
-    sample_size = min(num_pixels, sample_size)
-    indices = np.random.choice(num_pixels, size=sample_size, replace=False)
+    sample_size = min(len(pixel_labels), sample_size)
+    indices = np.random.choice(len(pixel_labels), size=sample_size, replace=False)
     pixel_features_sampled = pixel_features[indices]
     pixel_labels_sampled = pixel_labels[indices]
-    print(f"Number of pixels after subsampling: {sample_size}")
 
-    # Normalize features
     scaler = StandardScaler()
     pixel_features_normalized = scaler.fit_transform(pixel_features_sampled)
-    print("Pixel features normalized.")
 
     return pixel_features_normalized, pixel_labels_sampled
 
 
-'''
-def process_pixel_wise_features(latent_features_list, labels_list, sample_size):
-    """
-    Processes pixel-wise features and labels for segmentation masks.
+def extract_pixel_wise_features(latent_features, labels, ignore_index):
+    B, C, H, W = latent_features.shape
+    latent_features = latent_features.reshape(B, -1, C)
+    B, H, W = labels.shape
+    labels = labels.reshape(B, -1)
 
-    Parameters:
-    - latent_features_list: List of latent feature arrays.
-    - labels_list: List of label arrays.
-    - sample_size: Number of pixels to sample.
+    valid_indices = labels != ignore_index
+    pixel_features = latent_features[valid_indices]
+    pixel_labels = labels[valid_indices]
 
-    Returns:
-    - pixel_features_normalized: Normalized pixel-wise features.
-    - pixel_labels_sampled: Corresponding pixel labels.
-    """
-    pixel_features = []
-    pixel_labels = []
+    return pixel_features, pixel_labels
 
-    for idx, (features_batch, labels_batch) in enumerate(
-        zip(latent_features_list, labels_list)
-    ):
-        print(f"Processing batch {idx+1}/{len(latent_features_list)}")
 
-        # Handle dual-real-valued tensors by merging the last dimension into channels
-        if features_batch.ndim == 5 and features_batch.shape[-1] == 2:
-            # Merge the last dimension (real and imaginary) into the channel dimension
-            features_batch = features_batch.reshape(
-                features_batch.shape[0],
-                features_batch.shape[1] * features_batch.shape[4],
-                features_batch.shape[2],
-                features_batch.shape[3],
-            )
-            print(f"Reshaped dual-real-valued features_batch: {features_batch.shape}")
-        elif features_batch.ndim == 4 and features_batch.shape[0] == 1:
-            # Already merged real and imaginary parts
-            pass
-        else:
-            raise ValueError(
-                f"Unexpected shape for features_batch: {features_batch.shape}"
-            )
+def assign_colors(unique_labels, number_classes):
+    class_colors_dict = {
+        8: {
+            0: "black",
+            1: "purple",
+            2: "blue",
+            3: "green",
+            4: "red",
+            5: "cyan",
+            6: "yellow",
+            7: "orange",
+        },
+        6: {1: "purple", 2: "blue", 3: "green", 4: "red", 5: "cyan", 6: "yellow"},
+        4: {1: "green", 2: "brown", 3: "blue", 4: "yellow"},
+        7: {
+            1: "green",
+            2: "cyan",
+            3: "red",
+            4: "purple",
+            5: "orange",
+            6: "yellow",
+            7: "blue",
+        },
+    }
+    class_colors = class_colors_dict.get(number_classes, {})
 
-        # Handle labels_batch
-        if labels_batch.ndim == 2:
-            # If labels have shape (height, width), add batch dimension
-            labels_batch = np.expand_dims(labels_batch, axis=0)
-            print(f"Added batch dimension to labels_batch: {labels_batch.shape}")
-        elif labels_batch.ndim == 3 and labels_batch.shape[0] == 1:
-            # Batch size is 1, keep as is
-            pass
-        else:
-            raise ValueError(f"Unexpected shape for labels_batch: {labels_batch.shape}")
+    if not class_colors:
+        default_colors = px.colors.qualitative.Plotly
+        if number_classes > len(default_colors):
+            default_colors *= (number_classes // len(default_colors)) + 1
+        class_colors = {
+            label: color
+            for label, color in zip(unique_labels, default_colors[:number_classes])
+        }
 
-        # Now, features_batch should have shape (batch_size, channels, height, width)
-        #       labels_batch should have shape (batch_size, height, width)
-
-        # Check shapes
-        assert (
-            features_batch.ndim == 4
-        ), f"Features should have shape (batch_size, channels, height, width), got {features_batch.shape}"
-        assert (
-            labels_batch.ndim == 3
-        ), f"Labels should have shape (batch_size, height, width), got {labels_batch.shape}"
-
-        # Get batch size and dimensions
-        batch_size, channels, height, width = features_batch.shape
-
-        # Reshape features and labels
-        features_flat = features_batch.reshape(
-            batch_size, channels, -1
-        )  # (batch_size, channels, num_pixels)
-        labels_flat = labels_batch.reshape(batch_size, -1)  # (batch_size, num_pixels)
-
-        # Transpose features to (batch_size, num_pixels, channels)
-        features_flat = features_flat.transpose(0, 2, 1)
-
-        # Collect features and labels
-        for i in range(batch_size):
-            pixel_features.append(features_flat[i])  # (num_pixels, channels)
-            pixel_labels.append(labels_flat[i])  # (num_pixels,)
-
-    # Concatenate all data
-    pixel_features = np.concatenate(pixel_features, axis=0)  # (total_pixels, channels)
-    pixel_labels = np.concatenate(pixel_labels, axis=0)  # (total_pixels,)
-    print("Total number of pixels:", pixel_features.shape[0])
-
-    # Subsample pixels
-    num_pixels = pixel_features.shape[0]
-    sample_size = min(num_pixels, sample_size)
-    indices = np.random.choice(num_pixels, size=sample_size, replace=False)
-    pixel_features_sampled = pixel_features[indices]
-    pixel_labels_sampled = pixel_labels[indices]
-    print(f"Number of pixels after subsampling: {sample_size}")
-
-    # Normalize features
-    scaler = StandardScaler()
-    pixel_features_normalized = scaler.fit_transform(pixel_features_sampled)
-    print("Pixel features normalized.")
-
-    return pixel_features_normalized, pixel_labels_sampled
-'''
+    return class_colors
 
 
 def visualize_latent_space(
     features, labels, n_components, path, wandb_log, class_colors
 ):
-    """
-    Applies dimensionality reduction and visualizes the latent space with discrete labels.
-
-    Parameters:
-    - features: NumPy array of processed latent features.
-    - labels: NumPy array of labels corresponding to the features.
-    - n_components: Number of dimensions for UMAP (2 or 3).
-    - path: Path object where the HTML file will be saved.
-    - wandb_log: Boolean indicating whether to log the visualization to Weights & Biases.
-    - class_colors: Dictionary mapping label values to colors.
-
-    Returns:
-    - None (saves an interactive HTML plot of the latent space visualization).
-    """
-
     # Dimensionality reduction
     reducer = umap.UMAP(n_components=n_components)
     embeddings = reducer.fit_transform(features)
@@ -1820,128 +1436,3 @@ def visualize_latent_space(
     if wandb_log:
         wandb.log({f"umap": wandb.Html(str(path_html))})
         print("Visualization logged to Weights & Biases.")
-
-
-def log_model_performance(hyperparameters, metrics, excel_file_path, task):
-    """
-    Logs model performance and hyperparameters into an Excel file for a specific task.
-    Handles nested hyperparameters by creating hierarchical sub-columns.
-
-    Parameters:
-    - hyperparameters (dict): Dictionary containing the model's hyperparameters.
-    - metrics (dict): Dictionary containing the model's performance metrics.
-    - excel_file_path (str): Path to the Excel file where the data should be logged.
-    - task (str): Name of the task (e.g., 'segmentation', 'classification') to be used as the sheet name.
-    """
-    # Extract run_id and remove "logging" from hyperparameters
-    run_id = (
-        hyperparameters.get("logging", {})
-        .get("wandb", {})
-        .get("run_id", "unknown_run_id")
-    )
-    excel_file_path = (
-        os.path.dirname(os.path.dirname(hyperparameters["logging"]["logdir"]))
-        + "/"
-        + excel_file_path
-    )
-    del hyperparameters["logging"]
-    del hyperparameters["data"]["characteristics"]
-
-    log_entry = {"run_id": run_id}
-    log_entry.update(hyperparameters)
-    log_entry.update(metrics)
-
-    # Extract structure of the nested dictionary
-    tuples_structure, x_values = extract_structure(log_entry)
-
-    # Create a MultiIndex for the columns from the tuples
-    columns = pd.MultiIndex.from_tuples(tuples_structure)
-
-    # Create a DataFrame with one row containing the extracted values
-    log_df = pd.DataFrame([x_values], columns=columns)
-
-    # Check if the Excel file exists
-    if not os.path.exists(excel_file_path):
-        # If the file does not exist, create a new file with the sheet for the task
-        with pd.ExcelWriter(excel_file_path, engine="openpyxl") as writer:
-            log_df.to_excel(writer, sheet_name=task, index=True)
-        print(
-            f"Created new Excel file and logged model performance for {task} task with run ID {run_id}"
-        )
-    else:
-        # If the file exists, append the new row to the specified sheet
-        with pd.ExcelWriter(
-            excel_file_path, mode="a", if_sheet_exists="overlay", engine="openpyxl"
-        ) as writer:
-            if task in writer.sheets:
-                # Append the data to the existing sheet
-                start_row = writer.sheets[task].max_row
-                log_df.to_excel(
-                    writer,
-                    sheet_name=task,
-                    index=True,
-                    header=False,
-                    startrow=start_row,
-                )
-            else:
-                # Create a new sheet and write the data with headers
-                log_df.to_excel(writer, sheet_name=task, index=True)
-        print(
-            f"Logged model performance for {task} task with run ID {run_id} to {excel_file_path}"
-        )
-
-
-def extract_structure(nested_dict):
-    from collections import defaultdict
-
-    def find_max_depth(d, current_depth=0):
-        """Helper function to find the maximum depth of the nested dictionary."""
-        if isinstance(d, dict):
-            return max(
-                [find_max_depth(v, current_depth + 1) for v in d.values()],
-                default=current_depth,
-            )
-        return current_depth
-
-    def traverse_dict(d, current_path=(), parent=""):
-        """Helper function to recursively traverse the dictionary and extract keys and values, avoiding key name conflicts."""
-        for key, value in d.items():
-            new_key = key
-
-            # Detect if key needs disambiguation (same key appearing in different branches)
-            if key in key_occurrences and key_occurrences[key] > 1:
-                new_key = f"{parent}_{key}" if parent else key
-
-            new_path = current_path + (new_key,)
-
-            if isinstance(value, dict):
-                yield from traverse_dict(value, new_path, parent=new_key)
-            else:
-                yield new_path, value
-
-    # Step 1: Find the maximum depth
-    max_depth = find_max_depth(nested_dict)
-
-    # Step 2: Count key occurrences across all branches to detect duplicates
-    key_occurrences = defaultdict(int)
-
-    def count_keys(d):
-        """Helper function to count occurrences of keys in the nested dictionary."""
-        for key, value in d.items():
-            key_occurrences[key] += 1
-            if isinstance(value, dict):
-                count_keys(value)
-
-    count_keys(nested_dict)
-
-    # Step 3: Traverse the dictionary and gather keys and values
-    key_list = []
-    value_list = []
-
-    for path, value in traverse_dict(nested_dict):
-        # Extend the path with empty strings to match the maximum depth
-        padded_path = path + ("",) * (max_depth - len(path))
-        key_list.append(padded_path)
-        value_list.append(value)
-
-    return key_list, value_list

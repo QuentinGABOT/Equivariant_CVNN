@@ -38,6 +38,7 @@ class DoubleConv(nn.Module):
         activation,
         dtype,
         normalization_method,
+        track_running_stats,
         stride=1,
         res=False,
         mid_channels=None,
@@ -66,11 +67,11 @@ class DoubleConv(nn.Module):
         if normalization_method == "BatchNorm":
             if dtype == torch.complex64:
                 self.normalization1 = c_nn.BatchNorm2d(
-                    mid_channels, cdtype=dtype, track_running_stats=False
+                    mid_channels, cdtype=dtype, track_running_stats=track_running_stats
                 )
             elif dtype == torch.float64:
                 self.normalization1 = nn.BatchNorm2d(
-                    mid_channels, dtype=dtype, track_running_stats=True
+                    mid_channels, dtype=dtype, track_running_stats=track_running_stats
                 )
         elif normalization_method == "LayerNorm":
             if dtype == torch.complex64:
@@ -98,11 +99,15 @@ class DoubleConv(nn.Module):
         if normalization_method == "BatchNorm":
             if dtype == torch.complex64:
                 self.normalization2 = c_nn.BatchNorm2d(
-                    num_features=out_channels, cdtype=dtype, track_running_stats=False
+                    num_features=out_channels,
+                    cdtype=dtype,
+                    track_running_stats=track_running_stats,
                 )
             elif dtype == torch.float64:
                 self.normalization2 = nn.BatchNorm2d(
-                    num_features=out_channels, dtype=dtype, track_running_stats=True
+                    num_features=out_channels,
+                    dtype=dtype,
+                    track_running_stats=track_running_stats,
                 )
         elif normalization_method == "LayerNorm":
             if dtype == torch.complex64:
@@ -238,6 +243,7 @@ class Down(nn.Module):
         projection,
         softmax,
         normalization_method,
+        track_running_stats,
         dtype,
         downsampling_factor,
         res=False,
@@ -280,7 +286,9 @@ class Down(nn.Module):
                 self.downsampling_method = nn.MaxPool2d(downsampling_factor)
         elif downsampling_method == "AvgPool":
             if dtype == torch.complex64:
-                self.downsampling_method = c_nn.AvgPool2d(downsampling_factor)
+                self.downsampling_method = c_nn.AvgPool2d(
+                    downsampling_factor, stride=downsampling_factor
+                )
             elif dtype == torch.float64:
                 self.downsampling_method = nn.AvgPool2d(downsampling_factor)
 
@@ -302,6 +310,7 @@ class Down(nn.Module):
             activation=activation,
             input_size=input_size,
             normalization_method=normalization_method,
+            track_running_stats=track_running_stats,
             dtype=dtype,
             stride=stride,
             res=res,
@@ -336,6 +345,7 @@ class Up(nn.Module):
         projection,
         input_size,
         normalization_method,
+        track_running_stats,
         dtype,
         softmax,
         upsampling_factor,
@@ -355,7 +365,8 @@ class Up(nn.Module):
                 self.upsampling_method = nn.Upsample(
                     scale_factor=upsampling_factor, mode="bilinear"
                 )
-        elif upsampling_method == "ConvTranspose2d":
+
+        elif upsampling_method == "ConvTranspose":
             if dtype == torch.complex64:
                 self.upsampling_method = c_nn.ConvTranspose2d(
                     in_channels, out_channels, kernel_size=2, stride=upsampling_factor
@@ -368,7 +379,8 @@ class Up(nn.Module):
                     stride=upsampling_factor,
                     dtype=dtype,
                 )
-                in_channels = out_channels  # The case for ConvTranspose2d
+            in_channels = out_channels
+
         elif upsampling_method == "LPU":
             self.upsampling_method = upsampling_lpu(
                 in_channels, softmax=softmax, upsampling_factor=upsampling_factor
@@ -389,12 +401,14 @@ class Up(nn.Module):
 
         if skip_connections:
             in_channels += out_channels
+
         self.conv_layer = DoubleConv(
             in_channels=in_channels,
             out_channels=out_channels,
             activation=activation,
             input_size=input_size,
             normalization_method=normalization_method,
+            track_running_stats=track_running_stats,
             res=res,
             dtype=dtype,
         )

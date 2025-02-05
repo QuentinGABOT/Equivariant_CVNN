@@ -7,6 +7,7 @@ import pathlib
 import random
 from os import path, makedirs
 import copy
+from typing import Union
 
 # External imports
 import yaml
@@ -30,7 +31,6 @@ import torchtmpl as tl
 from torchtmpl.models.projection import PolyCtoR, MLPCtoR, NoCtoR, ModCtoR
 from torchtmpl.models.softmax import Softmax, SoftmaxMeanCtoR, SoftmaxProductCtoR
 from torchtmpl.losses import FocalLoss
-from torchtmpl.datasets import MNIST
 from torchcvnn.datasets import ALOSDataset, PolSFDataset, Bretigny
 
 
@@ -64,6 +64,7 @@ def load_model(
     config: dict,
     num_classes: int,
     num_channels: int,
+    img_size: int,
     projection,
     softmax,
     dtype: torch.dtype,
@@ -79,11 +80,12 @@ def load_model(
         config,
         num_classes=num_classes,
         num_channels=num_channels,
+        img_size=img_size,
         projection=projection,
         dtype=dtype,
         softmax=softmax,
     )
-    shift_eq, shift_inv, task = get_model_properties(model)
+    shift_eq, shift_inv, task = get_model_properties(config=config)
     model.load_state_dict(checkpoint["model_state_dict"])
     if shift_eq or shift_inv:
         tau = checkpoint["tau"]
@@ -95,6 +97,7 @@ def init_model(
     config: dict,
     num_classes: int,
     num_channels: int,
+    img_size: int,
     projection,
     softmax,
     dtype: torch.dtype,
@@ -106,11 +109,12 @@ def init_model(
         config,
         num_classes=num_classes,
         num_channels=num_channels,
+        img_size=img_size,
         projection=projection,
         dtype=dtype,
         softmax=softmax,
     )
-    shift_eq, shift_inv, task = get_model_properties(model)
+    shift_eq, shift_inv, task = get_model_properties(config=config)
     model.apply(init_weights)
     if shift_eq or shift_inv:
         tau = torch.tensor(config["model"]["gumbel_tau"]["start_value"])
@@ -125,10 +129,13 @@ def configure_wandb_logging(config: dict) -> None:
     if "wandb" in config["logging"]:
         wandb_config = config["logging"]["wandb"]
         project_name = wandb_config["project"]
+        entity_name = wandb_config["entity"]
         run_id = wandb_config.get("run_id")
 
         if config["pretrained"]:
-            wandb.init(project=project_name, resume="must", id=run_id)
+            wandb.init(
+                project=project_name, entity=entity_name, resume="must", id=run_id
+            )
             wandb_log = wandb.log
         else:
             config_cp = copy.deepcopy(config)
@@ -138,7 +145,9 @@ def configure_wandb_logging(config: dict) -> None:
             # Ensure tags are limited to 64 characters
             tags = [tag if len(tag) <= 64 else tag[:61] + "..." for tag in tags]
 
-            wandb.init(project=project_name, config=config_cp, tags=tags)
+            wandb.init(
+                project=project_name, entity=entity_name, config=config_cp, tags=tags
+            )
             config_cp["logging"]["wandb"]["run_id"] = wandb.run.id
             config["logging"]["wandb"]["run_id"] = wandb.run.id
             wandb_log = wandb.log
@@ -210,7 +219,7 @@ def remove_wandb_tags(config) -> None:
         config["model"].pop("latent_dim", None)
         config["model"].pop("dropout", None)
 
-    if "Equivariant" not in model_class:
+    if config["model"]["downsampling"] != "LPD":
         config["model"].pop("gumbel_tau", None)
 
     if config["optim"]["algo"] != "Adam":
@@ -306,6 +315,7 @@ def load(config: dict) -> tuple:
         class_weights,
         num_classes,
         num_channels,
+        img_size,
         ignore_index,
     ) = dt.get_dataloaders(data_config, use_cuda, dtype)
 
@@ -323,6 +333,7 @@ def load(config: dict) -> tuple:
             config,
             num_classes=num_classes,
             num_channels=num_channels,
+            img_size=img_size,
             projection=projection,
             dtype=dtype,
             softmax=softmax,
@@ -332,25 +343,12 @@ def load(config: dict) -> tuple:
             config,
             num_classes=num_classes,
             num_channels=num_channels,
+            img_size=img_size,
             projection=projection,
             dtype=dtype,
             softmax=softmax,
         )
-    """
-    model.eval()
-    with torch.no_grad():
-        dummy_input = torch.rand(
-            (
-                config["data"]["batch_size"],
-                num_channels,
-                config["data"]["img_size"],
-                config["data"]["img_size"],
-            ),
-            dtype=cdtype,
-            requires_grad=False,
-        )
-        validate_shift_invariance(model, dummy_input, shift_eq, shift_inv)
-    """
+
     model.to(device)
 
     # Build the loss function
@@ -563,10 +561,35 @@ def get_random_predictions(
         return ground_truth, predicted
 
 
-def train(config: dict) -> None:
+def retrain(params: list) -> None:
+    if len(params) != 1:
+        logging.error(f"Usage : {sys.argv[0]} retrain <logdir>")
+        sys.exit(-1)
+
+    logdir = pathlib.Path(params[0])
+    config_path = logdir / "config.yml"
+    logging.info(f"Loading {config_path}")
+    with open(config_path, "r") as file:
+        config = yaml.safe_load(file)
+        config["pretrained"] = True
+    train(config)
+
+
+def train(params: Union[list, dict]) -> None:
     """
     Train the model based on the given configuration.
     """
+    if isinstance(params, list):
+        if len(params) != 1:
+            logging.error(f"Usage : {sys.argv[0]} train <config.yaml>")
+            sys.exit(-1)
+
+        logging.info(f"Loading {params[0]}")
+        with open(params[0], "r") as file:
+            config = yaml.safe_load(file)
+    else:
+        config = params
+
     (
         model,
         optimizer,
@@ -586,7 +609,7 @@ def train(config: dict) -> None:
         log_path,
     ) = load(config)
 
-    shift_eq, shift_inv, task = get_model_properties(model)
+    shift_eq, shift_inv, task = get_model_properties(config=config)
 
     # Define the early stopping callback
     model_checkpoint = utils.ModelCheckpoint(
@@ -736,10 +759,21 @@ def log_images_and_metrics(
     torch.cuda.empty_cache()
 
 
-def test(config: dict) -> None:
+def test(params: list) -> None:
     """
     Test the model based on the given configuration.
     """
+    if len(params) != 1:
+        logging.error(f"Usage : {sys.argv[0]} test <logdir>")
+        sys.exit(-1)
+
+    logdir = pathlib.Path(params[0])
+    config_path = logdir / "config.yml"
+    logging.info(f"Loading {config_path}")
+    with open(config_path, "r") as file:
+        config = yaml.safe_load(file)
+        config["pretrained"] = True
+
     log_path = config["logging"]["logdir"]
 
     dtype_str = config.get("dtype")
@@ -777,6 +811,7 @@ def test(config: dict) -> None:
         class_weights,
         num_classes,
         num_channels,
+        img_size,
         ignore_index,
     ) = dt.get_dataloaders(data_config, use_cuda, dtype)
 
@@ -801,6 +836,7 @@ def test(config: dict) -> None:
         config,
         num_classes=num_classes,
         num_channels=num_channels,
+        img_size=img_size,
         projection=projection,
         dtype=dtype,
         softmax=softmax,
@@ -823,7 +859,7 @@ def test(config: dict) -> None:
     logdir = pathlib.Path(log_path)
     logging.info(f"Will be logging into {logdir}")
 
-    _, _, task = get_model_properties(model)
+    _, _, task = get_model_properties(config=config)
 
     res, to_be_visualised, cm = utils.test_epoch(
         model,
@@ -1002,13 +1038,6 @@ def test(config: dict) -> None:
             wandb_log=wandb_log,
         )
 
-    elif isinstance(test_loader.dataset.dataset, MNIST):
-        vis.plot_synchrony_images(
-            to_be_visualized=to_be_visualised,
-            logdir=logdir,
-            wandb_log=wandb_log,
-        )
-
 
 def validate_shift_invariance(
     model, dummy_input: torch.Tensor, shift_eq: bool, shift_inv: bool
@@ -1040,70 +1069,53 @@ def get_softmax(softmax, projection):
         return globals()[softmax]()
 
 
-def get_model_properties(model) -> tuple:
+def get_model_properties(config) -> tuple:
     """
     Get properties (shift, segmentation, classification, reconstruction) of the model.
     """
-    name = model.name
-    shift_equivariant = name in [
-        "AutoEncoderWDEquivariant",
-        "AutoEncoderWDResEquivariant",
-        "AutoEncoderWDResAttentionEquivariant",
-        "UNetEquivariant",
-        "UNetResEquivariant",
-        "UNetResAttentionEquivariant",
-    ]
-    shift_invariant = name in ["ResNetEquivariant", "ResNetAttentionEquivariant"]
+    model_class = config["model"]["class"]
+    downsampling_method = config["model"]["downsampling"]
+    upsampling_method = config["model"]["upsampling"]
+    shift_equivariant = (
+        model_class == "UNet"
+        or model_class == "AutoEncoder"
+        or model_class == "AutoEncoderWD"
+    ) and (
+        downsampling_method == "PolyphaseInvariantDown2D"
+        and upsampling_method == "PolyphaseInvariantUp2D"
+    )
+    shift_invariant = (model_class == "ResNet") and (
+        downsampling_method == "PolyphaseInvariantDown2D" and upsampling_method == None
+    )
 
-    if name in [
-        "UNet",
-        "UNetRes",
-        "UNetResAttention",
-        "UNetEquivariant",
-        "UNetResEquivariant",
-        "UNetResAttentionEquivariant",
-    ]:
+    if model_class == "UNet":
         task = "segmentation"
-    elif name in [
-        "ResNet",
-        "ResNetAttention",
-        "ResNetEquivariant",
-        "ResNetAttentionEquivariant",
-    ]:
+    elif model_class == "ResNet":
         task = "classification"
-    elif name in [
+    elif model_class in [
         "AutoEncoder",
-        "AutoEncoderRes",
-        "AutoEncoderResAttention",
         "AutoEncoderWD",
-        "AutoEncoderWDRes",
-        "AutoEncoderWDResAttention",
-        "AutoEncoderWDEquivariant",
-        "AutoEncoderWDResEquivariant",
-        "AutoEncoderWDResAttentionEquivariant",
     ]:
         task = "reconstruction"
     else:
-        raise ValueError(f"Unknown model name: {name}")
+        raise ValueError(f"Unknown model name: {model_class}")
 
     return shift_equivariant, shift_invariant, task
 
 
 if __name__ == "__main__":
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="%(message)s")
-    if len(sys.argv) not in [3, 4]:
-        logging.error(
-            f"Usage: {sys.argv[0]} config.yml [train|retrain|test] [path_to_run]"
-        )
+
+    logging.basicConfig(
+        stream=sys.stdout,
+        level=logging.INFO,
+        format="%(asctime)s %(message)s",
+        datefmt="%m/%d/%Y %I:%M:%S %p",
+    )
+
+    if len(sys.argv) <= 1:
+        logging.error(f"Usage : {sys.argv[0]} <train|retrain|test> ...")
         sys.exit(-1)
 
-    command = sys.argv[2]
-    logging.info(f"Loading {sys.argv[1]}")
+    command = sys.argv[1]
 
-    config_path = sys.argv[1]
-    config = load_config(config_path, command)
-
-    if command == "retrain":
-        command = "train"
-
-    eval(f"{command}(config)")
+    eval(f"{command}(sys.argv[2:])")

@@ -50,12 +50,9 @@ from sklearn.cluster import KMeans
 from sklearn.metrics.cluster import adjusted_rand_score
 
 from .losses import (
-    ComplexVAELoss,
-    ComplexVAEPhaseLoss,
     ComplexCrossEntropyLoss,
     FocalLoss,
 )
-from .datasets import MNIST
 
 THRESHOLD_MAGNITUDE = 0.1
 
@@ -273,8 +270,13 @@ def calc_ari_score(labels_true, labels_pred, with_background):
 
 def apply_kmeans(tensors, labels, threshold_magnitude=0.1):
     # Ensure tensors are 3D if originally 4D
-    tensors = np.squeeze(tensors, axis=1) if len(tensors.shape) == 4 else tensors
+
+    tensors = torch.squeeze(tensors, axis=1) if len(tensors.shape) == 4 else tensors
+    tensors = tensors.cpu().numpy()
+    labels = labels.cpu().numpy()
+
     input_phase = np.angle(tensors)
+
     input_amplitude = np.abs(tensors)
 
     # Map phase to the unit circle
@@ -312,7 +314,6 @@ def apply_kmeans(tensors, labels, threshold_magnitude=0.1):
         mask_mag = input_amplitude[idx] > threshold_magnitude
         area_to_eval = np.where((labels_pred[idx] > 0) & mask_mag)
         area_to_eval_back = np.where(mask_mag)
-
         # Compute ARI scores
         ari += adjusted_rand_score(
             labels[idx][area_to_eval].flatten(),
@@ -325,6 +326,7 @@ def apply_kmeans(tensors, labels, threshold_magnitude=0.1):
 
     # Return results
     valid_labels = len([l for l in labels if np.any(l != -1)])
+
     return labels_pred, ari / valid_labels, ari_with_back / valid_labels
 
 
@@ -468,7 +470,7 @@ def shift_consistency(
         circular = torch.mean(c_pred_outputs_1.eq(c_pred_outputs_2).float())
         standard = torch.mean(s_pred_outputs_1.eq(s_pred_outputs_2).float())
     else:
-        circular = torch.norm(c_pred_outputs_1 - c_pred_outputs_2)
+        circular = torch.norm(c_pred_outputs_1.cpu() - c_pred_outputs_2.cpu())
 
     return circular, standard
 
@@ -532,24 +534,7 @@ def train_epoch(
         # Forward propagate through the model
         _, pred_outputs = model(inputs)
 
-        if isinstance(f_loss, ComplexVAELoss) or isinstance(
-            f_loss, ComplexVAEPhaseLoss
-        ):
-            loss, recon_loss, kld, mu, sigma, delta = f_loss(
-                x=inputs,
-                recon_x=pred_outputs,
-                mu=mu,
-                sigma=sigma,
-                delta=delta,
-                kld_weight=config["loss"]["kld_weight"],
-            )
-            recon_loss_avg += inputs.shape[0] * recon_loss.item()
-            kld_avg += inputs.shape[0] * kld.item()
-            mu_avg += inputs.shape[0] * mu.item()
-            sigma_avg += inputs.shape[0] * sigma.item()
-            delta_avg += inputs.shape[0] * delta.item()
-
-        elif task in ["segmentation", "classification"]:
+        if task in ["segmentation", "classification"]:
             pred_outputs = softmax(pred_outputs)
 
             loss = f_loss(
@@ -575,12 +560,13 @@ def train_epoch(
         elif isinstance(f_loss, nn.MSELoss):
             if inputs.dtype == torch.complex64:
                 inputs_loss = torch.abs(inputs).type(torch.float64)
+            else:
+                inputs_loss = inputs
             loss = f_loss(pred_outputs, inputs_loss)
         else:
             loss = f_loss(pred_outputs, inputs)
 
-        if not isinstance(loader.dataset, MNIST):
-
+        if task == "segmentation" or task == "classification":
             c_shift, s_shift = shift_consistency(
                 model,
                 inputs,
@@ -591,6 +577,16 @@ def train_epoch(
             )
             circular += c_shift.item()
             standard += s_shift.item()
+        elif task == "reconstruction":
+            c_shift, _ = shift_consistency(
+                model,
+                inputs,
+                pred_outputs,
+                task,
+                softmax=softmax,
+                device=device,
+            )
+            circular += c_shift.item()
 
         # Backward pass and update
         optim.zero_grad()
@@ -636,43 +632,30 @@ def train_epoch(
         "train_loss": loss_avg / num_samples,
         "gradient_norm": gradient_norm / num_batches,
     }
-    if task == "generation":
-        metrics.update(
-            {
-                "train_recon_loss": recon_loss_avg / num_samples,
-                "train_kld": kld_avg / num_samples,
-                "train_mu": np.abs(mu_avg / num_samples),
-                "train_sigma": np.abs(sigma_avg / num_samples),
-                "train_delta": np.abs(delta_avg / num_samples),
-            }
+
+    metrics["train_circ_consistency"] = 100 * (circular / num_batches)
+
+    if task in ["segmentation", "classification"]:
+        metrics["train_std_consistency"] = 100 * (standard / num_batches)
+        overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
+        kappa_score = compute_kappa(conf_matrix_accum)
+        metrics_classif = compute_classification_metrics(
+            conf_matrix_accum, ignore_index
         )
-    else:
+        metrics["train_overall_accuracy"] = 100 * overall_accuracy
+        metrics["train_kappa_score"] = 100 * kappa_score
+        metrics["train_macro_precision"] = 100 * metrics_classif["macro_precision"]
+        metrics["train_macro_recall"] = 100 * metrics_classif["macro_recall"]
+        metrics["train_macro_f1"] = 100 * metrics_classif["macro_f1"]
+        metrics["train_precision_per_class"] = (
+            100 * metrics_classif["precision_per_class"]
+        )
+        metrics["train_recall_per_class"] = 100 * metrics_classif["recall_per_class"]
+        metrics["train_f1_per_class"] = 100 * metrics_classif["f1_per_class"]
 
-        metrics["train_circ_consistency"] = 100 * (circular / num_batches)
-
-        if task in ["segmentation", "classification"]:
-            metrics["train_std_consistency"] = 100 * (standard / num_batches)
-            overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
-            kappa_score = compute_kappa(conf_matrix_accum)
-            metrics_classif = compute_classification_metrics(
-                conf_matrix_accum, ignore_index
-            )
-            metrics["train_overall_accuracy"] = 100 * overall_accuracy
-            metrics["train_kappa_score"] = 100 * kappa_score
-            metrics["train_macro_precision"] = 100 * metrics_classif["macro_precision"]
-            metrics["train_macro_recall"] = 100 * metrics_classif["macro_recall"]
-            metrics["train_macro_f1"] = 100 * metrics_classif["macro_f1"]
-            metrics["train_precision_per_class"] = (
-                100 * metrics_classif["precision_per_class"]
-            )
-            metrics["train_recall_per_class"] = (
-                100 * metrics_classif["recall_per_class"]
-            )
-            metrics["train_f1_per_class"] = 100 * metrics_classif["f1_per_class"]
-
-            # Additional segmentation-specific metrics
-            if task == "segmentation":
-                metrics["train_mean_iou"] = 100 * (iou / num_batches)
+        # Additional segmentation-specific metrics
+        if task == "segmentation":
+            metrics["train_mean_iou"] = 100 * (iou / num_batches)
 
     return metrics
 
@@ -732,24 +715,7 @@ def valid_epoch(
             # Forward propagate through the model
             _, pred_outputs = model(inputs)
 
-            if isinstance(f_loss, ComplexVAELoss) or isinstance(
-                f_loss, ComplexVAEPhaseLoss
-            ):
-                loss, recon_loss, kld, mu, sigma, delta = f_loss(
-                    x=inputs,
-                    recon_x=pred_outputs,
-                    mu=mu,
-                    sigma=sigma,
-                    delta=delta,
-                    kld_weight=config["loss"]["kld_weight"],
-                )
-                recon_loss_avg += inputs.shape[0] * recon_loss.item()
-                kld_avg += inputs.shape[0] * kld.item()
-                mu_avg += inputs.shape[0] * mu.item()
-                sigma_avg += inputs.shape[0] * sigma.item()
-                delta_avg += inputs.shape[0] * delta.item()
-
-            elif task in ["segmentation", "classification"]:
+            if task in ["segmentation", "classification"]:
                 pred_outputs = softmax(pred_outputs)
 
                 loss = f_loss(
@@ -779,8 +745,7 @@ def valid_epoch(
             else:
                 loss = f_loss(pred_outputs, inputs)
 
-            if not isinstance(loader.dataset, MNIST):
-
+            if task == "segmentation" or task == "classification":
                 c_shift, s_shift = shift_consistency(
                     model,
                     inputs,
@@ -791,6 +756,16 @@ def valid_epoch(
                 )
                 circular += c_shift.item()
                 standard += s_shift.item()
+            elif task == "reconstruction":
+                c_shift, _ = shift_consistency(
+                    model,
+                    inputs,
+                    pred_outputs,
+                    task,
+                    softmax=softmax,
+                    device=device,
+                )
+                circular += c_shift.item()
 
             num_samples += inputs.shape[0]
             num_batches += 1
@@ -798,43 +773,29 @@ def valid_epoch(
 
     metrics = {"valid_loss": loss_avg / num_samples}
 
-    if task == "generation":
-        metrics.update(
-            {
-                "valid_recon_loss": recon_loss_avg / num_samples,
-                "valid_kld": kld_avg / num_samples,
-                "valid_mu": np.abs(mu_avg / num_samples),
-                "valid_sigma": np.abs(sigma_avg / num_samples),
-                "valid_delta": np.abs(delta_avg / num_samples),
-            }
+    metrics["valid_circ_consistency"] = 100 * (circular / num_batches)
+
+    if task in ["segmentation", "classification"]:
+        metrics["valid_std_consistency"] = 100 * (standard / num_batches)
+        overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
+        kappa_score = compute_kappa(conf_matrix_accum)
+        metrics_classif = compute_classification_metrics(
+            conf_matrix_accum, ignore_index
         )
-    else:
+        metrics["valid_overall_accuracy"] = 100 * overall_accuracy
+        metrics["valid_kappa_score"] = 100 * kappa_score
+        metrics["valid_macro_precision"] = 100 * metrics_classif["macro_precision"]
+        metrics["valid_macro_recall"] = 100 * metrics_classif["macro_recall"]
+        metrics["valid_macro_f1"] = 100 * metrics_classif["macro_f1"]
+        metrics["valid_precision_per_class"] = (
+            100 * metrics_classif["precision_per_class"]
+        )
+        metrics["valid_recall_per_class"] = 100 * metrics_classif["recall_per_class"]
+        metrics["valid_f1_per_class"] = 100 * metrics_classif["f1_per_class"]
 
-        metrics["valid_circ_consistency"] = 100 * (circular / num_batches)
-
-        if task in ["segmentation", "classification"]:
-            metrics["valid_std_consistency"] = 100 * (standard / num_batches)
-            overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
-            kappa_score = compute_kappa(conf_matrix_accum)
-            metrics_classif = compute_classification_metrics(
-                conf_matrix_accum, ignore_index
-            )
-            metrics["valid_overall_accuracy"] = 100 * overall_accuracy
-            metrics["valid_kappa_score"] = 100 * kappa_score
-            metrics["valid_macro_precision"] = 100 * metrics_classif["macro_precision"]
-            metrics["valid_macro_recall"] = 100 * metrics_classif["macro_recall"]
-            metrics["valid_macro_f1"] = 100 * metrics_classif["macro_f1"]
-            metrics["valid_precision_per_class"] = (
-                100 * metrics_classif["precision_per_class"]
-            )
-            metrics["valid_recall_per_class"] = (
-                100 * metrics_classif["recall_per_class"]
-            )
-            metrics["valid_f1_per_class"] = 100 * metrics_classif["f1_per_class"]
-
-            # Additional segmentation-specific metrics
-            if task == "segmentation":
-                metrics["valid_mean_iou"] = 100 * (iou / num_batches)
+        # Additional segmentation-specific metrics
+        if task == "segmentation":
+            metrics["valid_mean_iou"] = 100 * (iou / num_batches)
     return metrics
 
 
@@ -881,26 +842,9 @@ def test_epoch(
             inputs = Variable(inputs).to(device)
 
             # Forward propagate through the model
-            _, pred_outputs = model(inputs)
+            pred_outputs_unprojected, pred_outputs = model(inputs)
 
-            if task == "generation":
-                pass
-                """
-                loss, recon_loss, kld, mu, sigma, delta = f_loss(
-                    x=inputs,
-                    recon_x=pred_outputs,
-                    mu=mu,
-                    sigma=sigma,
-                    delta=delta,
-                    kld_weight=config["loss"]["kld_weight"],
-                )
-                recon_loss_avg += inputs.shape[0] * recon_loss.item()
-                kld_avg += inputs.shape[0] * kld.item()
-                mu_avg += inputs.shape[0] * mu.item()
-                sigma_avg += inputs.shape[0] * sigma.item()
-                delta_avg += inputs.shape[0] * delta.item()
-                """
-            elif task in ["segmentation", "classification"]:
+            if task in ["segmentation", "classification"]:
                 pred_outputs = softmax(pred_outputs)
 
                 if num_samples_to_visualize > 0:
@@ -926,7 +870,6 @@ def test_epoch(
 
                 conf_matrix_accum += batch_cm
 
-            if not isinstance(loader.dataset, MNIST):
                 c_shift, s_shift = shift_consistency(
                     model,
                     inputs,
@@ -937,63 +880,47 @@ def test_epoch(
                 )
                 circular += c_shift.item()
                 standard += s_shift.item()
-            else:
-                (
-                    labels_pred,
-                    ari_without_back_batch,
-                    ari_with_back_batch,
-                ) = apply_kmeans(pred_outputs, labels)
-                ari_without_back += ari_without_back_batch
-                ari_with_back += ari_with_back_batch
 
-                if num_samples_to_visualize > 0:
-                    num_samples_to_visualize -= 1
-                    to_be_visualized.append((inputs, labels, labels_pred))
+            elif task == "reconstruction":
+                c_shift, _ = shift_consistency(
+                    model,
+                    inputs,
+                    pred_outputs,
+                    task,
+                    softmax=softmax,
+                    device=device,
+                )
+                circular += c_shift.item()
 
             num_samples += inputs.shape[0]
             num_batches += 1
 
     metrics = {}
 
-    if task == "generation":
-        metrics.update(
-            {
-                "test_recon_loss": recon_loss_avg / num_samples,
-                "test_kld": kld_avg / num_samples,
-                "test_mu": np.abs(mu_avg / num_samples),
-                "test_sigma": np.abs(sigma_avg / num_samples),
-                "test_delta": np.abs(delta_avg / num_samples),
-            }
+    metrics["test_circ_consistency"] = 100 * (circular / num_batches)
+    if task in ["segmentation", "classification"]:
+        metrics["test_std_consistency"] = 100 * (standard / num_batches)
+        overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
+        kappa_score = compute_kappa(conf_matrix_accum)
+        metrics_classif = compute_classification_metrics(
+            conf_matrix_accum, ignore_index
         )
-    elif isinstance(loader.dataset, MNIST):
-        metrics["test_ari_without_back"] = 100 * (ari_without_back / num_batches)
-        metrics["test_ari_with_back"] = 100 * (ari_with_back / num_batches)
-    else:
+        conf_matrix_accum = normalize_confusion_matrix(conf_matrix_accum)
 
-        metrics["test_circ_consistency"] = 100 * (circular / num_batches)
-        if task in ["segmentation", "classification"]:
-            metrics["test_std_consistency"] = 100 * (standard / num_batches)
-            overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
-            kappa_score = compute_kappa(conf_matrix_accum)
-            metrics_classif = compute_classification_metrics(
-                conf_matrix_accum, ignore_index
-            )
-            conf_matrix_accum = normalize_confusion_matrix(conf_matrix_accum)
-
-            metrics["test_overall_accuracy"] = 100 * overall_accuracy
-            metrics["test_kappa_score"] = 100 * kappa_score
-            metrics["test_macro_precision"] = 100 * metrics_classif["macro_precision"]
-            metrics["test_macro_recall"] = 100 * metrics_classif["macro_recall"]
-            metrics["test_macro_f1"] = 100 * metrics_classif["macro_f1"]
-            metrics["test_precision_per_class"] = (
-                100 * metrics_classif["precision_per_class"]
-            )
-            metrics["test_recall_per_class"] = 100 * metrics_classif["recall_per_class"]
-            metrics["test_f1_per_class"] = 100 * metrics_classif["f1_per_class"]
-            if task == "segmentation":
-                iou_per_class, mean_iou = compute_iou(conf_matrix_accum)
-                metrics["test_mean_iou"] = 100 * mean_iou
-                metrics["test_iou_per_class"] = 100 * iou_per_class
+        metrics["test_overall_accuracy"] = 100 * overall_accuracy
+        metrics["test_kappa_score"] = 100 * kappa_score
+        metrics["test_macro_precision"] = 100 * metrics_classif["macro_precision"]
+        metrics["test_macro_recall"] = 100 * metrics_classif["macro_recall"]
+        metrics["test_macro_f1"] = 100 * metrics_classif["macro_f1"]
+        metrics["test_precision_per_class"] = (
+            100 * metrics_classif["precision_per_class"]
+        )
+        metrics["test_recall_per_class"] = 100 * metrics_classif["recall_per_class"]
+        metrics["test_f1_per_class"] = 100 * metrics_classif["f1_per_class"]
+        if task == "segmentation":
+            iou_per_class, mean_iou = compute_iou(conf_matrix_accum)
+            metrics["test_mean_iou"] = 100 * mean_iou
+            metrics["test_iou_per_class"] = 100 * iou_per_class
 
     return metrics, to_be_visualized, conf_matrix_accum
 
@@ -1071,20 +998,30 @@ def one_forward(
             # Retrieve the features
             if hook_handle is not None:
                 features = activation.get("penultimate", pred_outputs_not_projected)
+
                 if dtype == torch.complex64:
-                    features = torch.view_as_real(features)
+                    features = (
+                        torch.view_as_real(features)
+                        .permute(0, 4, 1, 2, 3)
+                        .reshape(
+                            features.size(0), -1, features.size(2), features.size(3)
+                        )
+                    )
+
                 latent_features.extend(
                     [features[i].cpu().numpy() for i in range(features.size(0))]
                 )
+
                 if labels is not None:
                     ground_truth.extend(
                         [labels[i].cpu().numpy() for i in range(labels.size(0))]
                     )
-                hook_handle.remove()
 
             if task in ["classification", "segmentation"]:
                 pred_outputs = softmax(pred_outputs).argmax(dim=1).cpu().numpy()
             outputs.extend(pred_outputs)
+
+    hook_handle.remove()
 
     if return_range:
         range_values["real_min"] /= len(loader)

@@ -21,6 +21,7 @@ class DeepNeuralNetwork(nn.Module):
         dtype,
         softmax,
         normalization_method,
+        track_running_stats,
         downsampling_method,
         upsampling_method,
         dropout,
@@ -38,9 +39,7 @@ class DeepNeuralNetwork(nn.Module):
         assert (
             num_classes is not None if dense and not upsampling else True
         ), "num_classes must be provided if dense and not upsampling"
-        assert (
-            upsampling_method is None if downsampling_method is None else True
-        ), "upsampling_method can not be selected if downsampling_method is None"
+
         self.name = model
         self.n_channels = num_channels
         self.num_classes = num_classes
@@ -61,6 +60,7 @@ class DeepNeuralNetwork(nn.Module):
                 out_channels=current_channels,
                 activation=activation,
                 normalization_method=normalization_method,
+                track_running_stats=track_running_stats,
                 input_size=input_size,
                 res=res,
                 dtype=dtype,
@@ -78,6 +78,7 @@ class DeepNeuralNetwork(nn.Module):
                         res=res,
                         input_size=input_size,
                         normalization_method=normalization_method,
+                        track_running_stats=track_running_stats,
                         downsampling_method=downsampling_method,
                         projection=projection,
                         channel_attention=channel_attention,
@@ -97,6 +98,7 @@ class DeepNeuralNetwork(nn.Module):
                             res=res,
                             input_size=input_size,
                             normalization_method=normalization_method,
+                            track_running_stats=track_running_stats,
                             downsampling_method=downsampling_method,
                             projection=projection,
                             channel_attention=channel_attention,
@@ -115,6 +117,7 @@ class DeepNeuralNetwork(nn.Module):
                             res=res,
                             input_size=input_size,
                             normalization_method=normalization_method,
+                            track_running_stats=track_running_stats,
                             downsampling_method=downsampling_method,
                             projection=projection,
                             channel_attention=channel_attention,
@@ -160,6 +163,7 @@ class DeepNeuralNetwork(nn.Module):
                         res=res,
                         input_size=input_size,
                         normalization_method=normalization_method,
+                        track_running_stats=track_running_stats,
                         skip_connections=skip_connections,
                         upsampling_method=upsampling_method,
                         projection=projection,

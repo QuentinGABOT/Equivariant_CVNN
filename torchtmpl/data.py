@@ -7,16 +7,49 @@ import shutil
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Subset
+import torchcvnn as cvnn
+from torch.utils.data import DataLoader, Subset, Dataset
 from sklearn.model_selection import train_test_split
 from sklearn.cluster import KMeans
-from torchcvnn.datasets import ALOSDataset, PolSFDataset, Bretigny
-from .datasets import Sethi, MSTAR, S1SLC, MNIST, GenericDatasetWrapper
-from . import transforms as transforms_module
+from torchcvnn.datasets import ALOSDataset, PolSFDataset, Bretigny, S1SLC
+from torchcvnn.transforms import FFTResize, PolSARtoTensor, ToTensor, Unsqueeze
 import torchvision
 
 # Constants for ignore index
 IGNORE_INDEX = -100
+
+
+class GenericDatasetWrapper(Dataset):
+    def __init__(self, dataset):
+        """
+        A generic dataset wrapper that works with any dataset class.
+
+        Args:
+            dataset: An instance of a dataset class (e.g., CIFAR10, MNIST, etc.).
+        """
+        self.dataset = dataset
+
+    def __getitem__(self, index):
+        """
+        Fetch an item from the dataset.
+
+        Args:
+            index: Index of the item to fetch.
+
+        Returns:
+            A tuple containing (data, target, index).
+        """
+        data, target = self.dataset[index]
+        return data, target, index
+
+    def __len__(self):
+        """
+        Get the length of the dataset.
+
+        Returns:
+            Length of the dataset.
+        """
+        return len(self.dataset)
 
 
 def get_transform_instance(transform_name, name_dataset, size):
@@ -26,19 +59,17 @@ def get_transform_instance(transform_name, name_dataset, size):
     # Get the classes from the module based on the transform names
     transform_instances = []
 
-    if name_dataset == "MSTAR":
-        transform_instances.append(transforms_module.ComplexResizeTransform(size))
-    elif name_dataset in ["PolSFDataset", "Bretigny", "S1SLC", "ALOSDataset"]:
-        transform_instances.append(transforms_module.PolSARtoArrayTransform())
+    if name_dataset in ["PolSFDataset", "Bretigny", "S1SLC", "ALOSDataset"]:
+        transform_instances.append(PolSARtoTensor())
+
+    transform_instances.append(ToTensor())
 
     for name in transform_names:
         try:
-            TransformClass = getattr(transforms_module, name)
+            TransformClass = getattr(cvnn.transforms, name)
         except AttributeError:
             TransformClass = getattr(torchvision.transforms, name)
         transform_instances.append(TransformClass())
-
-    transform_instances.append(transforms_module.CreateTensor())
 
     # If there's more than one transform, compose them
     if len(transform_instances) > 1:
@@ -105,19 +136,12 @@ def get_dataloaders(data_config: dict, use_cuda: bool, dtype) -> tuple:
         train_dataset, valid_dataset, test_dataset = prepare_bretigny_dataset(
             trainpath, img_size, img_stride, input_transform, data_config
         )
-    elif name_dataset == "MSTAR":
-        train_dataset, valid_dataset, test_dataset = prepare_mstar_dataset(
-            trainpath, img_size, input_transform, valid_ratio, test_ratio, data_config
-        )
+
     elif name_dataset == "S1SLC":
         train_dataset, valid_dataset, test_dataset = prepare_s1slc_dataset(
             trainpath, input_transform, valid_ratio, test_ratio, data_config
         )
-    elif name_dataset in ["2Shapes", "3Shapes", "MNIST_Shape"]:
-        train_dataset, valid_dataset, test_dataset = prepare_MNIST_dataset(
-            root=trainpath,
-            input_transform=input_transform,
-        )
+
     elif name_dataset == "PolSFDataset":
         train_dataset, valid_dataset, test_dataset, _, _, _, _ = prepare_polsfdataset(
             trainpath,
@@ -132,10 +156,9 @@ def get_dataloaders(data_config: dict, use_cuda: bool, dtype) -> tuple:
     if name_dataset in [
         "PolSFDataset",
         "Bretigny",
-        "MSTAR",
         "S1SLC",
     ]:
-        if name_dataset in ["PolSFDataset", "MSTAR", "S1SLC"]:
+        if name_dataset in ["PolSFDataset", "S1SLC"]:
             num_classes = len(train_dataset.dataset.classes)
         else:
             num_classes = len(train_dataset.classes)
@@ -165,6 +188,7 @@ def get_dataloaders(data_config: dict, use_cuda: bool, dtype) -> tuple:
     )
 
     num_channels = get_num_channels(train_loader)
+    img_size = train_loader.dataset[0][0].shape[-1]
 
     return (
         train_loader,
@@ -173,6 +197,7 @@ def get_dataloaders(data_config: dict, use_cuda: bool, dtype) -> tuple:
         class_weights,
         num_classes,
         num_channels,
+        img_size,
         ignore_index,
     )
 
@@ -267,8 +292,16 @@ def extract_data_config(data_config: dict) -> tuple:
     """
     Extracts necessary fields from the data configuration dictionary.
     """
-    img_size = (data_config["img_size"], data_config["img_size"])
-    img_stride = (data_config["img_stride"], data_config["img_stride"])
+    if "img_size" not in data_config.keys():
+        img_size = None
+    else:
+        img_size = (data_config["img_size"], data_config["img_size"])
+
+    if "img_stride" not in data_config.keys():
+        img_stride = None
+    else:
+        img_stride = (data_config["img_stride"], data_config["img_stride"])
+
     valid_ratio = data_config["valid_ratio"]
     test_ratio = data_config["test_ratio"]
     batch_size = data_config["batch_size"]
@@ -364,37 +397,6 @@ def prepare_bretigny_dataset(
     return train_dataset, valid_dataset, test_dataset
 
 
-def prepare_mstar_dataset(
-    trainpath, img_size, input_transform, valid_ratio, test_ratio, data_config
-):
-    base_dataset = eval(
-        f"{data_config['dataset']['name']}(root=trainpath, transform=input_transform, img_size=img_size)"
-    )
-    labels = [base_dataset[idx][1] for idx in range(len(base_dataset))]
-    train_indices, temp_indices = train_test_split(
-        list(range(len(base_dataset))),
-        stratify=labels,
-        test_size=(valid_ratio + test_ratio),
-    )
-
-    temp_masks = [labels[i] for i in temp_indices]
-    valid_indices, test_indices = train_test_split(
-        temp_indices,
-        stratify=temp_masks,
-        test_size=(test_ratio / (valid_ratio + test_ratio)),
-    )
-
-    train_dataset = Subset(base_dataset, train_indices)
-    valid_dataset = Subset(base_dataset, valid_indices)
-    test_dataset = Subset(base_dataset, test_indices)
-
-    logging.info(f"  - Training set: {len(train_dataset)} samples")
-    logging.info(f"  - Validation set: {len(valid_dataset)} samples")
-    logging.info(f"  - Test set: {len(test_dataset)} samples")
-
-    return train_dataset, valid_dataset, test_dataset
-
-
 def prepare_s1slc_dataset(
     trainpath, input_transform, valid_ratio, test_ratio, data_config
 ):
@@ -474,17 +476,6 @@ def prepare_polsfdataset(
     )
 
 
-def prepare_MNIST_dataset(root, input_transform):
-    train_dataset = MNIST(root=root, fold="train", transform=input_transform)
-    valid_dataset = MNIST(root=root, fold="val", transform=input_transform)
-    test_dataset = MNIST(root=root, fold="test", transform=input_transform)
-    logging.info(f"  - Training set: {len(train_dataset)} samples")
-    logging.info(f"  - Validation set: {len(valid_dataset)} samples")
-    logging.info(f"  - Test set: {len(test_dataset)} samples")
-
-    return train_dataset, valid_dataset, test_dataset
-
-
 def compute_class_weights(train_dataset, num_classes, ignore_index):
     if isinstance(train_dataset[0][1], int):
         all_labels = torch.tensor(
@@ -526,72 +517,6 @@ def get_num_channels(loader):
     Get the number of channels from the first image in the dataset.
     """
     return loader.dataset[0][0].shape[0]
-
-
-def get_prostate_t2_dataset():
-    import argparse
-    import h5py
-    import numpy as np
-    from pathlib import Path
-    from matplotlib import pyplot as plt
-    import xml.etree.ElementTree as etree
-    from .fastmri_prostate.reconstruction.t2.prostate_t2_recon import t2_reconstruction
-    from .fastmri_prostate.data.mri_data import load_file_T2, save_recon
-    import warnings
-    import os
-
-    file_name = "/gpfs/workdir/gabotqu/datasets/fastMRI_PROSTATE_T2/fastMRI_prostate_T2_IDS_001_020/file_prostate_AXT2_001.h5"
-
-    kspace, calibration_data, ismrmrd_header, reconstruction_rss, image_atts = (
-        load_file_T2(file_name)
-    )
-
-    print("Sizes of the array fields in the fastMRI prostate T2 file:")
-    print(
-        "kspace:",
-        kspace.shape,
-        ", calibration_data:",
-        calibration_data.shape,
-        ", reconstruction_rss:",
-        reconstruction_rss.shape,
-    )
-
-    img_dict_t2 = t2_reconstruction(kspace, calibration_data, ismrmrd_header)
-    print("Size of reconstructed data:")
-    print(img_dict_t2["reconstruction_rss"].shape)
-    print("Type of reconstructed data:")
-    print(img_dict_t2["reconstruction_rss"].dtype)
-
-    def display_t2_slice(img, slice_num):
-        plt.imshow(np.abs(img[slice_num, :, :]), cmap="gray")
-        plt.title("Reconstructed T2 image - slice 11")
-        plt.axis("off")
-        plt.savefig(
-            "/gpfs/workdir/gabotqu/complex-valued-generarive-ai-for-sar-imaging/test.png"
-        )
-
-    display_t2_slice(img_dict_t2["reconstruction_rss"], 10)
-
-    input()
-
-    """
-    # start here
-    hf = h5py.File(file_name)
-    print('Keys:', list(hf.keys()))
-    print('Attrs:', dict(hf.attrs))
-
-    kspace = hf['kspace'][()]
-    calibration_data = hf['calibration_data'][()]
-    reconstruction_rss = hf['reconstruction_rss'][()]
-    ismrmrd_header = hf['ismrmrd_header'][()]
-
-    print("Sizes of the array fields in the fastMRI prostate T2 file:")
-    print("kspace:", kspace.shape, ", calibration_data:", calibration_data.shape, ", reconstruction_rss:", reconstruction_rss.shape)
-
-    input()
-    # End here
-
-    """
 
 
 def reassemble_image(
