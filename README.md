@@ -13,6 +13,6 @@ Then, you specify the experiment you want to run with a `config.yaml` file.
 Check the example `config.yaml` we provide. Then :
 
 ```bash
-python -m torchtmpl.main train config.yaml
+python -m torchtmpl.main config.yml train 
 
 ```
