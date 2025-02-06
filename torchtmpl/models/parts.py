@@ -162,86 +162,6 @@ class DoubleConv(nn.Module):
         return out
 
 
-class ChannelAttention(nn.Module):
-    def __init__(self, in_channels, projection):
-        super(ChannelAttention, self).__init__()
-        self.shared_layer_one = nn.Conv1d(
-            in_channels=in_channels,
-            out_channels=in_channels,
-            kernel_size=3,
-            padding=1,
-            bias=False,
-            dtype=torch.float64,
-        )
-        if isinstance(projection, NoCtoR):
-            self.projection = ModCtoR()
-        else:
-            self.projection = projection
-
-        self.avg_pool = nn.AdaptiveMaxPool2d((1, 1))
-        self.max_pool = nn.AdaptiveMaxPool2d((1, 1))
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, input_feature):
-        projected_input = self.projection(input_feature)
-        # Global Average Pooling
-        avg_pool = self.avg_pool(projected_input)
-        avg_pool = avg_pool.squeeze(-1)  # Remove last dimension
-        avg_pool = self.shared_layer_one(
-            avg_pool
-        )  # Conv1d expects input with shape [batch, channels, width]
-        avg_pool = avg_pool.unsqueeze(-1)  # Add one dimension
-
-        # Global Max Pooling
-        max_pool = self.max_pool(projected_input)
-        max_pool = max_pool.squeeze(-1)  # Remove last dimension
-        max_pool = self.shared_layer_one(
-            max_pool
-        )  # Conv1d expects input with shape [batch, channels, width]
-        max_pool = max_pool.unsqueeze(-1)  # Add one dimension
-
-        # ECA Feature
-        eca_feature = avg_pool + max_pool
-        eca_feature = self.sigmoid(eca_feature)
-
-        attention_feature = torch.mul(input_feature, eca_feature)
-        return attention_feature
-
-
-class SpatialAttention(
-    nn.Module
-):  # impossible to be shift-equivariant ? shift-invariant ?
-    def __init__(self, projection, kernel_size=7):
-        super(SpatialAttention, self).__init__()
-        self.conv1 = nn.Conv2d(
-            in_channels=2,
-            out_channels=1,
-            kernel_size=kernel_size,
-            stride=1,
-            padding="same",
-            bias=False,
-            dtype=torch.float64,
-        )
-        if isinstance(projection, NoCtoR):
-            self.projection = ModCtoR()
-        else:
-            self.projection = projection
-
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, input_feature):
-        projected_input = self.projection(input_feature)
-        avg_pool = torch.mean(projected_input, dim=1, keepdim=True)
-        max_pool, _ = torch.max(projected_input, dim=1, keepdim=True)
-        pooled_feature = torch.cat([avg_pool, max_pool], dim=1)
-        attention_feature = self.conv1(pooled_feature)
-        attention_feature = self.sigmoid(attention_feature)
-        attention_feature = torch.mul(input_feature, attention_feature).type(
-            torch.complex64
-        )
-        return attention_feature
-
-
 class Down(nn.Module):
     def __init__(
         self,
@@ -265,6 +185,8 @@ class Down(nn.Module):
         super().__init__()
 
         if downsampling_method is None:
+            self.downsampling_method = None
+        elif downsampling_method == "StridedConv":
             self.downsampling_method = None
             stride = downsampling_factor
         elif downsampling_method == "LPD":
@@ -304,16 +226,6 @@ class Down(nn.Module):
 
         input_size = input_size // downsampling_factor
 
-        if channel_attention:
-            self.channel_attention = ChannelAttention(
-                out_channels, projection=projection
-            )
-        else:
-            self.channel_attention = None
-        if spatial_attention:
-            self.spatial_attention = SpatialAttention(projection=projection)
-        else:
-            self.spatial_attention = None
         self.conv_layer = DoubleConv(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -338,10 +250,7 @@ class Down(nn.Module):
             ):
                 x = self.downsampling_method(x)
         x = self.conv_layer(x)
-        if self.channel_attention:
-            x = self.channel_attention(x)
-        if self.spatial_attention:
-            x = self.spatial_attention(x)
+
         return x, prob
 
 
@@ -400,17 +309,6 @@ class Up(nn.Module):
 
         input_size = input_size * upsampling_factor
 
-        if channel_attention:
-            self.channel_attention = ChannelAttention(
-                out_channels, projection=projection
-            )
-        else:
-            self.channel_attention = None
-        if spatial_attention:
-            self.spatial_attention = SpatialAttention(projection=projection)
-        else:
-            self.spatial_attention = None
-
         if skip_connections:
             in_channels += out_channels
 
@@ -436,10 +334,7 @@ class Up(nn.Module):
             x1 = self.upsampling_method(x1, prob=prob)
         x = concat(x1, x2)
         x = self.conv_layer(x)
-        if self.channel_attention:
-            x = self.channel_attention(x)
-        if self.spatial_attention:
-            x = self.spatial_attention(x)
+
         return x
 
 

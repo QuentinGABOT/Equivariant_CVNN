@@ -25,7 +25,7 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
         # Convert alpha to a tensor if it's provided as a list/array.
         if alpha is not None:
-            self.alpha = torch.tensor(alpha, dtype=torch.float32)
+            self.alpha = alpha.clone().detach()
         else:
             self.alpha = None
 
