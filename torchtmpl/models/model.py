@@ -85,6 +85,7 @@ class DeepNeuralNetwork(nn.Module):
                         spatial_attention=spatial_attention,
                         dtype=dtype,
                         softmax=softmax,
+                        dropout=dropout,
                         downsampling_factor=DOWNSAMPLING_FACTOR,
                     )
                 )
@@ -105,6 +106,7 @@ class DeepNeuralNetwork(nn.Module):
                             spatial_attention=spatial_attention,
                             dtype=dtype,
                             softmax=softmax,
+                            dropout=dropout,
                             downsampling_factor=DOWNSAMPLING_FACTOR,
                         )
                     )
@@ -124,6 +126,7 @@ class DeepNeuralNetwork(nn.Module):
                             spatial_attention=spatial_attention,
                             dtype=dtype,
                             softmax=softmax,
+                            dropout=dropout,
                             downsampling_factor=DOWNSAMPLING_FACTOR,
                         )
                     )
@@ -142,7 +145,6 @@ class DeepNeuralNetwork(nn.Module):
                     num_classes,
                     latent_dim=latent_dim,
                     activation=activation,
-                    dropout=dropout,
                     unflatten=upsampling,
                     projection=projection,
                     dtype=dtype,
@@ -171,6 +173,7 @@ class DeepNeuralNetwork(nn.Module):
                         spatial_attention=spatial_attention,
                         dtype=dtype,
                         softmax=softmax,
+                        dropout=dropout,
                         upsampling_factor=UPSAMPLING_FACTOR,
                     )
                 )
@@ -183,7 +186,6 @@ class DeepNeuralNetwork(nn.Module):
                         in_channels=current_channels,
                         out_channels=num_channels,
                         projection=projection,
-                        dropout=0,
                         dtype=dtype,
                     )
                 )
@@ -193,7 +195,6 @@ class DeepNeuralNetwork(nn.Module):
                         in_channels=current_channels,
                         out_channels=num_classes,
                         projection=projection,
-                        dropout=dropout,
                         dtype=dtype,
                     )
                 )

@@ -488,6 +488,7 @@ def train_epoch(
     number_classes,
     epoch: int,
     ignore_index=-100,
+    max_norm=2.5,
 ) -> dict:
     """
     Run the training loop for nsteps minibatches of the dataloader
@@ -593,7 +594,9 @@ def train_epoch(
         loss.backward()
 
         # Clip gradients to prevent the exploding gradient problem
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.25, norm_type=2)
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(), max_norm=max_norm, norm_type=2
+        )
 
         # Compute the norm of the gradients
         total_norm = np.sqrt(

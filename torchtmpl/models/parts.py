@@ -39,6 +39,7 @@ class DoubleConv(nn.Module):
         dtype,
         normalization_method,
         track_running_stats,
+        dropout=0,
         stride=1,
         res=False,
         mid_channels=None,
@@ -121,6 +122,11 @@ class DoubleConv(nn.Module):
         elif normalization_method == None:
             self.normalization2 = nn.Identity()
 
+        if dtype == torch.complex64:
+            self.dropout = c_nn.Dropout2d(dropout)
+        elif dtype == torch.float64:
+            self.dropout = nn.Dropout2d(dropout)
+
         self.shortcut = nn.Sequential()
         if (stride != 1 or in_channels != out_channels) and res:
             self.shortcut = nn.Sequential(
@@ -145,6 +151,9 @@ class DoubleConv(nn.Module):
         out = self.activation(self.normalization1(self.conv1(x)))
 
         out = self.normalization2(self.conv2(out))
+
+        out = self.dropout(out)
+
         if self.res:
             if self.shortcut:
                 identity = self.shortcut(identity)
@@ -246,6 +255,7 @@ class Down(nn.Module):
         track_running_stats,
         dtype,
         downsampling_factor,
+        dropout,
         res=False,
         downsampling_method=None,
         channel_attention=False,
@@ -314,6 +324,7 @@ class Down(nn.Module):
             dtype=dtype,
             stride=stride,
             res=res,
+            dropout=dropout,
         )
 
     def forward(self, x):
@@ -349,6 +360,7 @@ class Up(nn.Module):
         dtype,
         softmax,
         upsampling_factor,
+        dropout,
         res=False,
         upsampling_method=None,
         skip_connections=False,
@@ -411,6 +423,7 @@ class Up(nn.Module):
             track_running_stats=track_running_stats,
             res=res,
             dtype=dtype,
+            dropout=dropout,
         )
 
     def forward(self, x1, x2=None, prob=None):
@@ -431,7 +444,7 @@ class Up(nn.Module):
 
 
 class OutConv(nn.Module):
-    def __init__(self, in_channels, out_channels, projection, dropout, dtype):
+    def __init__(self, in_channels, out_channels, projection, dtype):
         super(OutConv, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(
@@ -441,15 +454,10 @@ class OutConv(nn.Module):
                 dtype=dtype,
             ),
         )
-        if dtype == torch.complex64:
-            self.dropout = c_nn.Dropout(dropout)
-        elif dtype == torch.float64:
-            self.dropout = nn.Dropout(dropout)
         self.projection = projection
 
     def forward(self, x):
         x = self.conv(x)
-        x = self.dropout(x)
         x_projected = self.projection(x)
         return x, x_projected
 
@@ -463,7 +471,6 @@ class Dense(nn.Module):
         projection,
         dtype,
         latent_dim=None,
-        dropout=None,
         activation=None,
         unflatten: bool = False,
     ):
@@ -473,13 +480,7 @@ class Dense(nn.Module):
         elif dtype == torch.float64:
             self.avg_pool = nn.AvgPool2d(input_size, input_size)
         self.unflatten = unflatten
-        if dropout:
-            if dtype == torch.complex64:
-                self.dropout = c_nn.Dropout(dropout)
-            elif dtype == torch.float64:
-                self.dropout = nn.Dropout(dropout)
-        else:
-            self.dropout = None
+
         if activation:
             self.activation = activation
         else:
@@ -508,8 +509,6 @@ class Dense(nn.Module):
         x_projected = None
         x = torch.flatten(self.avg_pool(x), 1)
         x = self.fc_1(x)
-        if self.dropout:
-            x = self.dropout(x)
 
         if self.unflatten:
             if self.activation:
