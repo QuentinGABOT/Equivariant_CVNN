@@ -38,7 +38,7 @@ model:
     gamma: 0.1
     start_decay_epoch: 10
     min_value: 0.00001
-nepochs: 500
+nepochs: 350
 optim:
   algo: AdamW
   params:
