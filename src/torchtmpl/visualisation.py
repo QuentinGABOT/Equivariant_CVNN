@@ -1192,7 +1192,7 @@ def plot_latent_features(
     wandb_log,
     ignore_index,
     n_components=2,
-    sample_size=5000,
+    sample_size=20000,
 ):
     if len(labels.shape) == 3:
         latent_features, labels = extract_pixel_wise_features(
@@ -1257,9 +1257,9 @@ def process_pixel_wise_features(latent_features, labels, sample_size, ignore_ind
 
 def extract_pixel_wise_features(latent_features, labels, ignore_index):
     B, C, H, W = latent_features.shape
-    latent_features = latent_features.reshape(B, -1, C)
+    latent_features = latent_features.transpose(0, 2, 3, 1).reshape(-1, C)
     B, H, W = labels.shape
-    labels = labels.reshape(B, -1)
+    labels = labels.reshape(-1)
 
     valid_indices = labels != ignore_index
     pixel_features = latent_features[valid_indices]

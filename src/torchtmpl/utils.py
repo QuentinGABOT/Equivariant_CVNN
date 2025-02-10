@@ -133,24 +133,18 @@ def normalize_confusion_matrix(conf_matrix):
     return normalized_matrix
 
 
-def compute_batch_iou(predictions, labels, ignore_index=None):
-    mask = labels != ignore_index
-    filtered_predictions = predictions[mask]
-    filtered_ground_truth = labels[mask]
+# def compute_batch_iou(predictions, labels, ignore_index):
+#     mask = labels != ignore_index
+#     filtered_predictions = predictions[mask]
+#     filtered_ground_truth = labels[mask]
 
-    # Calculate Jaccard Index (IoU)
-    return jaccard_score(
-        filtered_ground_truth, filtered_predictions, average="weighted"
-    )
+#     # Calculate Jaccard Index (IoU)
+#     return jaccard_score(filtered_ground_truth, filtered_predictions, average=None)
 
 
 # Function to compute confusion matrix for a batch
-def compute_batch_confusion_matrix(predictions, labels, size, ignore_index=None):
-    mask = (
-        labels != ignore_index
-        if ignore_index is not None
-        else torch.ones_like(labels, dtype=bool)
-    )
+def compute_batch_confusion_matrix(predictions, labels, size, ignore_index):
+    mask = labels != ignore_index
     predictions = predictions[mask]
     labels = labels[mask]
     return confusion_matrix(
@@ -386,9 +380,7 @@ def standard_shift_consistency(model, inputs, task, device):
 
     inputs = Variable(inputs).to(device)
 
-    if (
-        task == "segmentation" or task == "reconstruction"
-    ):  # validé. On pourrait prendre le contexte de l'image pour être plus précis
+    if task == "segmentation" or task == "reconstruction":
         off0 = np.random.randint(1, 9)
         off1 = np.random.randint(1, 9)
 
@@ -406,7 +398,7 @@ def standard_shift_consistency(model, inputs, task, device):
         output = output[:, :, off0:, off1:]
         output_s = output_s[:, :, off0:, off1:]
 
-    elif task == "classification":  # validé, pas parfait mais ça fonctionne
+    elif task == "classification":
         off0 = np.random.randint(1, 5)
         off1 = np.random.randint(1, 5)
 
@@ -433,7 +425,7 @@ def circular_shift_consistency(model, inputs, task, device):
     with torch.no_grad():
         _, pred_outputs_s = model(inputs_s)
 
-    pred_outputs_s = pred_outputs_s.cpu()
+    pred_outputs_s = pred_outputs_s
     if task == "segmentation" or task == "reconstruction":
         pred_outputs_s = torch.roll(
             pred_outputs_s, shifts=(-off0, -off1), dims=(-1, -2)
@@ -441,9 +433,7 @@ def circular_shift_consistency(model, inputs, task, device):
     return pred_outputs_s
 
 
-def shift_consistency(
-    model, inputs, c_pred_outputs_1: torch.Tensor, task, softmax, device
-):
+def shift_consistency(model, inputs, c_pred_outputs_1, task, softmax, device):
     circular = 0
     standard = 0
 
@@ -454,18 +444,18 @@ def shift_consistency(
 
     if task == "classification" or task == "segmentation":
 
-        c_pred_outputs_1 = torch.argmax(
-            c_pred_outputs_1
+        c_pred_outputs_1 = c_pred_outputs_1.argmax(
+            dim=1
         ).cpu()  # we use the softmax in case prob is of type complex.64
-        c_pred_outputs_2 = torch.argmax(
-            softmax(c_pred_outputs_2)
-        ).cpu()  # we use the softmax in case prob is of type complex.64
-        s_pred_outputs_1 = torch.argmax(
-            softmax(s_pred_outputs_1)
-        ).cpu()  # we use the softmax in case prob is of type complex.64
-        s_pred_outputs_2 = torch.argmax(
-            softmax(s_pred_outputs_2)
-        ).cpu()  # we use the softmax in case prob is of type complex.64
+        c_pred_outputs_2 = (
+            softmax(c_pred_outputs_2).argmax(dim=1).cpu()
+        )  # we use the softmax in case prob is of type complex.64
+        s_pred_outputs_1 = (
+            softmax(s_pred_outputs_1).argmax(dim=1).cpu()
+        )  # we use the softmax in case prob is of type complex.64
+        s_pred_outputs_2 = (
+            softmax(s_pred_outputs_2).argmax(dim=1).cpu()
+        )  # we use the softmax in case prob is of type complex.64
         # Measure agreement between the top-1 predictions
         circular = torch.mean(c_pred_outputs_1.eq(c_pred_outputs_2).float())
         standard = torch.mean(s_pred_outputs_1.eq(s_pred_outputs_2).float())
@@ -513,7 +503,6 @@ def train_epoch(
     delta_avg = 0
     circular = 0
     standard = 0
-    iou = 0
     gradient_norm = 0
     num_samples = 0
     num_batches = 0
@@ -521,8 +510,10 @@ def train_epoch(
     if task in ["segmentation", "classification"]:
         size = np.setdiff1d(np.arange(0, number_classes), np.array([ignore_index]))
         conf_matrix_accum = np.zeros((len(size), len(size)))
+        iou_classes = np.zeros((len(size)))
     else:
         conf_matrix_accum = None
+        iou_classes = None
 
     for data in tqdm.tqdm(loader):
         if isinstance(data, tuple) or isinstance(data, list):
@@ -545,7 +536,6 @@ def train_epoch(
 
             predictions_flat = pred_outputs.argmax(dim=1).cpu().numpy().flatten()
             labels_flat = labels.cpu().numpy().flatten()
-
             # Update confusion matrix
             batch_cm = compute_batch_confusion_matrix(
                 predictions=predictions_flat,
@@ -555,8 +545,10 @@ def train_epoch(
             )
             conf_matrix_accum += batch_cm
 
-            if task == "segmentation":
-                iou += compute_batch_iou(predictions_flat, labels_flat)
+            # if task == "segmentation":
+            #     iou_classes += compute_batch_iou(
+            #         predictions_flat, labels_flat, ignore_index=ignore_index
+            #     )
 
         elif isinstance(f_loss, nn.MSELoss):
             if inputs.dtype == torch.complex64:
@@ -566,28 +558,6 @@ def train_epoch(
             loss = f_loss(pred_outputs, inputs_loss)
         else:
             loss = f_loss(pred_outputs, inputs)
-
-        if task == "segmentation" or task == "classification":
-            c_shift, s_shift = shift_consistency(
-                model,
-                inputs,
-                pred_outputs,
-                task,
-                softmax=softmax,
-                device=device,
-            )
-            circular += c_shift.item()
-            standard += s_shift.item()
-        elif task == "reconstruction":
-            c_shift, _ = shift_consistency(
-                model,
-                inputs,
-                pred_outputs,
-                task,
-                softmax=softmax,
-                device=device,
-            )
-            circular += c_shift.item()
 
         # Backward pass and update
         optim.zero_grad()
@@ -636,10 +606,7 @@ def train_epoch(
         "gradient_norm": gradient_norm / num_batches,
     }
 
-    metrics["train_circ_consistency"] = 100 * (circular / num_batches)
-
     if task in ["segmentation", "classification"]:
-        metrics["train_std_consistency"] = 100 * (standard / num_batches)
         overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
         kappa_score = compute_kappa(conf_matrix_accum)
         metrics_classif = compute_classification_metrics(
@@ -658,7 +625,9 @@ def train_epoch(
 
         # Additional segmentation-specific metrics
         if task == "segmentation":
-            metrics["train_mean_iou"] = 100 * (iou / num_batches)
+            iou_classes, mean_iou = compute_iou(conf_matrix_accum)
+            metrics["train_iou_per_class"] = 100 * iou_classes
+            metrics["train_mean_iou"] = 100 * mean_iou
 
     return metrics
 
@@ -738,8 +707,10 @@ def valid_epoch(
                 )
                 conf_matrix_accum += batch_cm
 
-                if task == "segmentation":
-                    iou += compute_batch_iou(predictions_flat, labels_flat)
+                # if task == "segmentation":
+                #     iou += compute_batch_iou(
+                #         predictions_flat, labels_flat, ignore_index=ignore_index
+                #     )
 
             elif isinstance(f_loss, nn.MSELoss):
                 if inputs.dtype == torch.complex64:
@@ -798,7 +769,9 @@ def valid_epoch(
 
         # Additional segmentation-specific metrics
         if task == "segmentation":
-            metrics["valid_mean_iou"] = 100 * (iou / num_batches)
+            iou_classes, mean_iou = compute_iou(conf_matrix_accum)
+            metrics["valid_iou_per_class"] = 100 * iou_classes
+            metrics["valid_mean_iou"] = 100 * mean_iou
     return metrics
 
 
@@ -921,16 +894,14 @@ def test_epoch(
         metrics["test_recall_per_class"] = 100 * metrics_classif["recall_per_class"]
         metrics["test_f1_per_class"] = 100 * metrics_classif["f1_per_class"]
         if task == "segmentation":
-            iou_per_class, mean_iou = compute_iou(conf_matrix_accum)
+            iou_classes, mean_iou = compute_iou(conf_matrix_accum)
+            metrics["test_iou_per_class"] = 100 * iou_classes
             metrics["test_mean_iou"] = 100 * mean_iou
-            metrics["test_iou_per_class"] = 100 * iou_per_class
 
     return metrics, to_be_visualized, conf_matrix_accum
 
 
-def one_forward(
-    model, loader, task, softmax, device, dtype, return_range=False, indices=None
-):
+def one_forward(model, loader, task, softmax, device, dtype, return_range=False):
     outputs = []
     model.eval()
     model.to(device)
@@ -1000,7 +971,7 @@ def one_forward(
 
             # Retrieve the features
             if hook_handle is not None:
-                features = activation.get("penultimate", pred_outputs_not_projected)
+                features = activation.get("penultimate")
 
                 if dtype == torch.complex64:
                     features = (

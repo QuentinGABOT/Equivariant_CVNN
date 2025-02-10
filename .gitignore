@@ -25,7 +25,9 @@ venv/
 
 # logs and wandb
 logs/*
+src/logs/*
 wandb/*
+src/wandb/*
 
 # pytorch best model and experiments
 best_model.pt
