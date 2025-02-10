@@ -1,16 +1,16 @@
 data:
-  batch_size: 2048
+  batch_size: 64
   dataset:
     name: PolSFDataset
     trainpath: ../datasets/SAN_FRANCISCO_ALOS2
   #transform: LogAmplitude, Amplitude
   #transform: LogAmplitude, RealImaginary
   transform: LogAmplitude
-  img_size: 16
-  img_stride: 16
+  img_size: 64
+  img_stride: 64
   num_workers: 4
-  valid_ratio: 0.2
-  test_ratio: 0.2
+  valid_ratio: 0.15
+  test_ratio: 0.15
 logging:
   logdir: ./logs
   wandb:
@@ -22,7 +22,7 @@ loss:
 model:
   #activation: ReLU
   activation: modReLU
-  channels_ratio: 16
+  channels_ratio: 32
   class: UNet
   res: true
   projection:
@@ -36,23 +36,23 @@ model:
     #softmax: SoftmaxProductCtoR
     softmax: Softmax
   #downsampling: MaxPool
-  #downsampling: Null
+  downsampling: StridedConv
   #downsampling: AvgPool
-  downsampling: LPD
+  #downsampling: LPD
   #downsampling: APS
   #downsampling: LPF
-  #upsampling: Upsample
+  upsampling: Upsample
   #upsampling: Null
   #upsampling: ConvTranspose
-  upsampling: LPU
-  latent_dim: 8192
-  dropout : 0
+  #upsampling: LPU
+  latent_dim: Null
+  dropout : 0.15
   normalization: 
     method: BatchNorm
     #method: Null
     #method: LayerNorm
     track_running_stats: false
-  num_layers: 4
+  num_layers: 5
   gumbel_tau:
     start_value: 10
     gamma: 0.1
@@ -67,7 +67,7 @@ optim:
 scheduler:
   algo: StepLR
   params:
-    step_size: 10
+    step_size: 5
     gamma: 0.9
   # algo: ReduceLROnPlateau
   # params:
