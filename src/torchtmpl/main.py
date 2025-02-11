@@ -929,8 +929,10 @@ def test(params: list) -> None:
             dtype=dtype,
         )
 
-        if isinstance(projection, PolyCtoR) and (
-            config["model"]["projection"]["global"]
+        if (
+            isinstance(projection, PolyCtoR)
+            and (config["model"]["projection"]["global"])
+            and (dtype == torch.complex64)
         ):
             vis.plot_projection_interactive(
                 projection.poly,

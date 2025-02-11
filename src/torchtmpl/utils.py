@@ -193,11 +193,7 @@ def compute_iou(confusion_matrix):
 
 
 # Function to compute classification metrics
-def compute_classification_metrics(conf_matrix, ignore_index=None):
-    if ignore_index is not None:
-        conf_matrix = np.delete(conf_matrix, ignore_index, axis=0)
-        conf_matrix = np.delete(conf_matrix, ignore_index, axis=1)
-
+def compute_classification_metrics(conf_matrix):
     precision = np.diag(conf_matrix) / (conf_matrix.sum(axis=0) + 1e-6)
     recall = np.diag(conf_matrix) / (conf_matrix.sum(axis=1) + 1e-6)
     f1 = 2 * precision * recall / (precision + recall + 1e-6)
@@ -510,10 +506,8 @@ def train_epoch(
     if task in ["segmentation", "classification"]:
         size = np.setdiff1d(np.arange(0, number_classes), np.array([ignore_index]))
         conf_matrix_accum = np.zeros((len(size), len(size)))
-        iou_classes = np.zeros((len(size)))
     else:
         conf_matrix_accum = None
-        iou_classes = None
 
     for data in tqdm.tqdm(loader):
         if isinstance(data, tuple) or isinstance(data, list):
@@ -609,9 +603,7 @@ def train_epoch(
     if task in ["segmentation", "classification"]:
         overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
         kappa_score = compute_kappa(conf_matrix_accum)
-        metrics_classif = compute_classification_metrics(
-            conf_matrix_accum, ignore_index
-        )
+        metrics_classif = compute_classification_metrics(conf_matrix_accum)
         metrics["train_overall_accuracy"] = 100 * overall_accuracy
         metrics["train_kappa_score"] = 100 * kappa_score
         metrics["train_macro_precision"] = 100 * metrics_classif["macro_precision"]
@@ -753,9 +745,7 @@ def valid_epoch(
         metrics["valid_std_consistency"] = 100 * (standard / num_batches)
         overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
         kappa_score = compute_kappa(conf_matrix_accum)
-        metrics_classif = compute_classification_metrics(
-            conf_matrix_accum, ignore_index
-        )
+        metrics_classif = compute_classification_metrics(conf_matrix_accum)
         metrics["valid_overall_accuracy"] = 100 * overall_accuracy
         metrics["valid_kappa_score"] = 100 * kappa_score
         metrics["valid_macro_precision"] = 100 * metrics_classif["macro_precision"]
@@ -878,9 +868,7 @@ def test_epoch(
         metrics["test_std_consistency"] = 100 * (standard / num_batches)
         overall_accuracy = compute_overall_accuracy(conf_matrix_accum)
         kappa_score = compute_kappa(conf_matrix_accum)
-        metrics_classif = compute_classification_metrics(
-            conf_matrix_accum, ignore_index
-        )
+        metrics_classif = compute_classification_metrics(conf_matrix_accum)
         conf_matrix_accum = normalize_confusion_matrix(conf_matrix_accum)
 
         metrics["test_overall_accuracy"] = 100 * overall_accuracy
@@ -956,18 +944,19 @@ def one_forward(model, loader, task, softmax, device, dtype, return_range=False)
             pred_outputs_not_projected, pred_outputs = model(inputs)
 
             if return_range:
-                range_values["real_min"] += (
-                    pred_outputs_not_projected.real.min().cpu().item()
-                )
-                range_values["real_max"] += (
-                    pred_outputs_not_projected.real.max().cpu().item()
-                )
-                range_values["imag_min"] += (
-                    pred_outputs_not_projected.imag.min().cpu().item()
-                )
-                range_values["imag_max"] += (
-                    pred_outputs_not_projected.imag.max().cpu().item()
-                )
+                if dtype == torch.complex64:
+                    range_values["real_min"] += (
+                        pred_outputs_not_projected.real.min().cpu().item()
+                    )
+                    range_values["real_max"] += (
+                        pred_outputs_not_projected.real.max().cpu().item()
+                    )
+                    range_values["imag_min"] += (
+                        pred_outputs_not_projected.imag.min().cpu().item()
+                    )
+                    range_values["imag_max"] += (
+                        pred_outputs_not_projected.imag.max().cpu().item()
+                    )
 
             # Retrieve the features
             if hook_handle is not None:
