@@ -24,6 +24,7 @@ model:
   res: true
   projection:
     class: ModCtoR
+    global: true
     softmax: Softmax
   downsampling: LPD
   upsampling: LPU
