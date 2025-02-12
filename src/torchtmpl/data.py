@@ -401,8 +401,9 @@ def prepare_s1slc_dataset(
     trainpath, input_transform, valid_ratio, test_ratio, data_config
 ):
     base_dataset = eval(
-        f"{data_config['dataset']['name']}(root=trainpath, transform=input_transform)"
+        f"{data_config['dataset']['name']}(root=trainpath, transform=input_transform, lazy_loading=False)"
     )
+
     labels = [base_dataset[idx][1] for idx in range(len(base_dataset))]
     train_indices, temp_indices = train_test_split(
         list(range(len(base_dataset))),

@@ -848,8 +848,8 @@ def test(params: list) -> None:
             (
                 config["data"]["batch_size"],
                 num_channels,
-                config["data"]["img_size"],
-                config["data"]["img_size"],
+                img_size,
+                img_size,
             ),
             dtype=dtype,
             requires_grad=False,
@@ -861,7 +861,7 @@ def test(params: list) -> None:
 
     _, _, task = get_model_properties(config=config)
 
-    res, to_be_visualised, cm = utils.test_epoch(
+    res, to_be_visualized, cm = utils.test_epoch(
         model,
         test_loader,
         task=task,
@@ -1002,14 +1002,14 @@ def test(params: list) -> None:
             sets_indices=None,
         )
 
-        to_be_visualised = [
+        to_be_visualized = [
             image_input[np.newaxis, ...],
             ground_truth[np.newaxis, ...],
             predicted[np.newaxis, ...],
         ]
         if task == "segmentation":
             vis.plot_segmentation_images(
-                to_be_visualized=to_be_visualised,
+                to_be_visualized=to_be_visualized,
                 confusion_matrix=cm,
                 number_classes=num_classes,
                 ignore_index=ignore_index,
@@ -1019,20 +1019,23 @@ def test(params: list) -> None:
             )
         elif task == "reconstruction":
             vis.plot_reconstruction_polsar_images(
-                to_be_visualised=to_be_visualised,
+                to_be_visualized=to_be_visualized,
                 logdir=logdir,
                 wandb_log=wandb_log,
             )
 
     elif task == "classification":
         vis.plot_classification_images(
-            to_be_visualised=to_be_visualised,
+            to_be_visualized=to_be_visualized,
             logdir=logdir,
             wandb_log=wandb_log,
+            confusion_matrix=cm,
+            number_classes=num_classes,
+            dtype=dtype,
         )
     elif task == "segmentation":
         vis.plot_segmentation_images(
-            to_be_visualized=to_be_visualised,
+            to_be_visualized=to_be_visualized,
             confusion_matrix=cm,
             number_classes=num_classes,
             ignore_index=ignore_index,

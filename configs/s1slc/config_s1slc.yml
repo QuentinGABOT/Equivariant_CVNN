@@ -2,12 +2,10 @@ data:
   batch_size: 64
   dataset:
     name: S1SLC
-    trainpath: ../datasets/S1SLC
+    trainpath: ../../datasets/S1SLC
   #transform: LogAmplitude, Amplitude
   #transform: LogAmplitude, RealImaginary
   transform: LogAmplitude
-  img_size: 64
-  img_stride: 64
   num_workers: 4
   valid_ratio: 0.15
   test_ratio: 0.15
@@ -15,14 +13,14 @@ logging:
   logdir: ./logs
   wandb:
     entity: equivariant_cvnn
-    project: polsf
+    project: s1slc
 loss:
   name: FocalLoss
   gamma: 5
 model:
   #activation: ReLU
   activation: modReLU
-  channels_ratio: 32
+  channels_ratio: 16
   class: ResNet
   res: true
   projection:
@@ -36,36 +34,36 @@ model:
     #softmax: SoftmaxProductCtoR
     softmax: Softmax
   #downsampling: MaxPool
-  downsampling: StridedConv
+  #downsampling: StridedConv
   #downsampling: AvgPool
-  #downsampling: LPD
+  downsampling: LPD
   #downsampling: APS
   #downsampling: LPF
   upsampling: Null
   latent_dim: Null
-  dropout : 0.15
+  dropout : 0.1
   normalization: 
     method: BatchNorm
     #method: Null
     #method: LayerNorm
     track_running_stats: false
-  num_layers: 5
+  num_layers: 4
   gumbel_tau:
-    start_value: 10
+    start_value: 5
     gamma: 0.1
-    start_decay_epoch: 10
+    start_decay_epoch: 5
     min_value: 0.00001
 nepochs: 300
 optim:
   algo: AdamW
   params:
-    lr: 0.005
+    lr: 0.001
     weight_decay: 0.0005
 scheduler:
   algo: StepLR
   params:
-    step_size: 5
-    gamma: 0.9
+    step_size: 1000
+    gamma: 1
   # algo: ReduceLROnPlateau
   # params:
   #   mode: min

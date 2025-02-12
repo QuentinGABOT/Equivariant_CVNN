@@ -815,11 +815,13 @@ def test_epoch(
 
                 if num_samples_to_visualize > 0:
                     num_samples_to_visualize -= 1
+                    random_index = np.random.randint(0, inputs.shape[0])
+
                     to_be_visualized.append(
                         (
-                            inputs.cpu().numpy(),
-                            labels.cpu().numpy(),
-                            pred_outputs.argmax(dim=1).cpu().numpy(),
+                            inputs[random_index].cpu().numpy(),
+                            labels[random_index].cpu().numpy(),
+                            pred_outputs.argmax(dim=1)[random_index].cpu().numpy(),
                         )
                     )
 
@@ -905,7 +907,7 @@ def one_forward(model, loader, task, softmax, device, dtype, return_range=False)
 
     # Set the appropriate hook based on the task
     if task == "classification":
-        hook_handle = model.dense[0].avg_pool.register_forward_hook(
+        hook_handle = model.dense[-1].fc_1.register_forward_hook(
             get_activation("penultimate")
         )
     elif task == "segmentation":
@@ -963,13 +965,17 @@ def one_forward(model, loader, task, softmax, device, dtype, return_range=False)
                 features = activation.get("penultimate")
 
                 if dtype == torch.complex64:
-                    features = (
-                        torch.view_as_real(features)
-                        .permute(0, 4, 1, 2, 3)
-                        .reshape(
-                            features.size(0), -1, features.size(2), features.size(3)
+                    if task == "classification":
+                        features = torch.view_as_real(features)
+                        features = features.reshape(features.size(0), -1)
+                    elif task == "segmentation":
+                        features = (
+                            torch.view_as_real(features)
+                            .permute(0, 4, 1, 2, 3)
+                            .reshape(
+                                features.size(0), -1, features.size(2), features.size(3)
+                            )
                         )
-                    )
 
                 latent_features.extend(
                     [features[i].cpu().numpy() for i in range(features.size(0))]

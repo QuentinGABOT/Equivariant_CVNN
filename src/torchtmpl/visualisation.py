@@ -24,6 +24,7 @@ import plotly.express as px
 MIN_VALUE = 0.02
 MAX_VALUE = 40
 
+
 def pauli_transform(sar_img: np.ndarray) -> np.ndarray:
     """
     Perform Pauli decomposition on the SAR image.
@@ -785,6 +786,7 @@ def plot_classification_images(
     confusion_matrix: np.ndarray,
     number_classes: int,
     logdir: str,
+    dtype,
     wandb_log: bool,
 ) -> None:
 
@@ -819,8 +821,13 @@ def plot_classification_images(
     # Plot classification images
     for i in range(num_samples):
         row_idx = i + 1
-        axes[row_idx][0].imshow(to_be_visualized[i][0])
-        axes[row_idx][0].set_title(f"Image {i+1} (Sample)")
+
+        img = to_be_visualized[i][0]
+        if dtype == torch.float64:
+            img = torch.view_as_complex(img).cpu().numpy()
+
+        axes[row_idx][0].imshow(np.abs(exp_amplitude_transform(img[0])), cmap="gray")
+        axes[row_idx][0].set_title(f"Amplitude HH Image {i+1} (Sample)")
         axes[row_idx][0].axis("off")
 
         # Plot the label and the prediction
@@ -1199,14 +1206,12 @@ def plot_latent_features(
             latent_features, labels, ignore_index
         )
     latent_features, labels = sampling(latent_features, labels, sample_size)
-
     # Determine number of classes
     unique_labels = np.unique(labels)
     number_classes = len(unique_labels)
     print(f"Number of classes: {number_classes}")
 
     class_colors = assign_colors(unique_labels, number_classes)
-
     # Process latent features
     latent_features_processed = process_latent_features(latent_features)
 
