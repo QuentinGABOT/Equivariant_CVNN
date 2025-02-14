@@ -43,10 +43,11 @@ configs/*.yml
 # Slurm
 logslurms
 job.sbatch
-submit-slurm.py
 
 # Excel files
 *.xlsx
 
 # Tex files
 *.tex
+
+job_id/*
