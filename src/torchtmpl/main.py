@@ -579,14 +579,17 @@ def train(params: Union[list, dict]) -> None:
     """
     Train the model based on the given configuration.
     """
+    log_file = None
     if isinstance(params, list):
-        if len(params) != 1:
-            logging.error(f"Usage : {sys.argv[0]} train <config.yaml>")
+        if len(params) not in [1,2]:
+            logging.error(f"Usage : {sys.argv[0]} train <config.yaml> <tmp_logfile>")
             sys.exit(-1)
 
         logging.info(f"Loading {params[0]}")
         with open(params[0], "r") as file:
             config = yaml.safe_load(file)
+        if len(params) == 2:
+            log_file = params[1]
     else:
         config = params
 
@@ -608,6 +611,10 @@ def train(params: Union[list, dict]) -> None:
         softmax,
         log_path,
     ) = load(config)
+    # log when we need to run multiple runs in the submission script
+    if log_file is not None:
+        with open(log_file, "w") as file:
+            file.write(f"{logdir}")
 
     shift_eq, shift_inv, task = get_model_properties(config=config)
 
