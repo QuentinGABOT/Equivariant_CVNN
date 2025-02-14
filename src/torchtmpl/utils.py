@@ -796,7 +796,7 @@ def test_epoch(
     else:
         conf_matrix_accum = None
 
-    to_be_visualized = []
+    to_be_vizualized = []
 
     with torch.no_grad():
         for data in tqdm.tqdm(loader):
@@ -817,7 +817,7 @@ def test_epoch(
                     num_samples_to_visualize -= 1
                     random_index = np.random.randint(0, inputs.shape[0])
 
-                    to_be_visualized.append(
+                    to_be_vizualized.append(
                         (
                             inputs[random_index].cpu().numpy(),
                             labels[random_index].cpu().numpy(),
@@ -888,7 +888,7 @@ def test_epoch(
             metrics["test_iou_per_class"] = 100 * iou_classes
             metrics["test_mean_iou"] = 100 * mean_iou
 
-    return metrics, to_be_visualized, conf_matrix_accum
+    return metrics, to_be_vizualized, conf_matrix_accum
 
 
 def one_forward(model, loader, task, softmax, device, dtype, return_range=False):

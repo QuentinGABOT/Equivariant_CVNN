@@ -624,7 +624,7 @@ def calculate_ncols(
 
 
 def plot_segmentation_images(
-    to_be_visualized: list,
+    to_be_vizualized: list,
     confusion_matrix: np.ndarray,
     number_classes: int,
     logdir: str,
@@ -678,7 +678,7 @@ def plot_segmentation_images(
     ]
 
     # Limit number of samples to visualize
-    num_samples = to_be_visualized[0].shape[0]
+    num_samples = to_be_vizualized[0].shape[0]
     nrows = num_samples + 1  # +1 for confusion matrix
     ncols = 4 if sets_masks is not None else 3  # Add test mask column if available
 
@@ -691,9 +691,9 @@ def plot_segmentation_images(
 
     # Plot ground truth, predictions, masked predictions, and optionally test masks
     for i in range(num_samples):
-        img = to_be_visualized[0][i]
-        g_t = to_be_visualized[1][i]
-        pred = to_be_visualized[2][i]
+        img = to_be_vizualized[0][i]
+        g_t = to_be_vizualized[1][i]
+        pred = to_be_vizualized[2][i]
 
         # Mask prediction if ignore_index is provided
         if ignore_index is not None:
@@ -782,7 +782,7 @@ def plot_segmentation_images(
 
 
 def plot_classification_images(
-    to_be_visualized: list,
+    to_be_vizualized: list,
     confusion_matrix: np.ndarray,
     number_classes: int,
     logdir: str,
@@ -790,7 +790,7 @@ def plot_classification_images(
     wandb_log: bool,
 ) -> None:
 
-    num_samples = len(to_be_visualized)
+    num_samples = len(to_be_vizualized)
     nrows = num_samples + 1  # +1 for confusion matrix
     ncols = 2  # To keep images in two columns
 
@@ -822,7 +822,7 @@ def plot_classification_images(
     for i in range(num_samples):
         row_idx = i + 1
 
-        img = to_be_visualized[i][0]
+        img = to_be_vizualized[i][0]
         if dtype == torch.float64:
             img = torch.view_as_complex(img).cpu().numpy()
 
@@ -834,7 +834,7 @@ def plot_classification_images(
         axes[row_idx][1].text(
             0.5,
             0.5,
-            f"Label: {to_be_visualized[i][1]}\nPrediction: {to_be_visualized[i][2]}",
+            f"Label: {to_be_vizualized[i][1]}\nPrediction: {to_be_vizualized[i][2]}",
             horizontalalignment="center",
             verticalalignment="center",
             transform=axes[row_idx][1].transAxes,
@@ -862,12 +862,12 @@ def plot_classification_images(
 
 
 def plot_synchrony_images(
-    to_be_visualized: list,
+    to_be_vizualized: list,
     logdir: str,
     wandb_log: bool,
 ):
 
-    num_samples = len(to_be_visualized)  # Number of samples
+    num_samples = len(to_be_vizualized)  # Number of samples
     ncols = 3  # Ground truth, Prediction, and Original Image
     fig, axes = plt.subplots(
         nrows=num_samples,
@@ -880,9 +880,9 @@ def plot_synchrony_images(
 
     for i in range(num_samples):
         # Extract ground truth, prediction, and image
-        g_t = torch.abs(to_be_visualized[i][0]).cpu().numpy()  # to discard the phase
-        pred = to_be_visualized[i][1].cpu().numpy()
-        img = to_be_visualized[i][2]  # already in numpy
+        g_t = torch.abs(to_be_vizualized[i][0]).cpu().numpy()  # to discard the phase
+        pred = to_be_vizualized[i][1].cpu().numpy()
+        img = to_be_vizualized[i][2]  # already in numpy
 
         rnd = np.random.randint(0, len(img))
         img = img[rnd]
@@ -915,12 +915,12 @@ def plot_synchrony_images(
 
 
 def plot_reconstruction_polsar_images(
-    to_be_visualized: list,
+    to_be_vizualized: list,
     num_channels: int,
     logdir: str,
     wandb_log: bool,
 ) -> None:
-    num_samples = to_be_visualized.shape[0]  # Number of samples
+    num_samples = to_be_vizualized.shape[0]  # Number of samples
     ncols = 12  # Number of plots per sample
     fig, axes = plt.subplots(
         nrows=num_samples,
@@ -952,8 +952,8 @@ def plot_reconstruction_polsar_images(
     for i in range(num_samples):
         idx = 0
 
-        g_t = to_be_visualized[i, 0]
-        pred = to_be_visualized[i, 1]
+        g_t = to_be_vizualized[i, 0]
+        pred = to_be_vizualized[i, 1]
 
         # Amplitude images (Pauli and Krogager basis)
         img_ground_truth = exp_amplitude_transform(g_t).numpy().transpose(1, 2, 0)

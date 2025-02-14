@@ -217,7 +217,6 @@ def remove_wandb_tags(config) -> None:
 
     if ("AutoEncoder" and not "WD") or "ResNet" not in model_class:
         config["model"].pop("latent_dim", None)
-        config["model"].pop("dropout", None)
 
     if config["model"]["downsampling"] != "LPD":
         config["model"].pop("gumbel_tau", None)
@@ -483,82 +482,6 @@ def save_model_summary(
     logging.info(summary_text)
     if config.get("wandb"):
         wandb.log({"summary": summary_text})
-
-
-def visualize_images(
-    data_loader,
-    model,
-    device,
-    logdir,
-    epoch,
-    last=False,
-    train=False,
-    test=False,
-    num_classes=None,
-    task=None,
-    ignore_index=-100,
-) -> pathlib.Path:
-    """
-    Visualize images and save them to the logging directory.
-    """
-    model.eval()
-    ground_truths, predictions = [], []
-
-    for i, data in zip(range(5), iter(data_loader)):
-        inputs, labels = data if isinstance(data, (tuple, list)) else (data, None)
-        g_t, predicted = get_random_predictions(model, inputs, labels, device, task)
-        ground_truths.append(g_t)
-        predictions.append(predicted)
-
-    image_path = logdir / f"output_{epoch}_{'train' if train else 'valid'}.png"
-    last = last or epoch % 10 == 0
-    vis.show_images(
-        ground_truths,
-        predictions,
-        image_path,
-        task,
-        last,
-        test,
-        number_classes=num_classes,
-        ignore_index=ignore_index,
-    )
-
-    return image_path
-
-
-def get_random_predictions(
-    model: nn.Module,
-    inputs: torch.Tensor,
-    labels: torch.Tensor,
-    device: torch.device,
-    task: str,
-) -> tuple:
-    """
-    Get images using the model and return the original and predicted/generated images.
-    """
-    if task == "segmentation":
-        index = random.randint(0, len(inputs) - 1)
-        _, predicted = model(inputs[index].unsqueeze_(0).to(device))
-        predicted = np.argmax(predicted.cpu().detach().numpy()[0, :, :, :], axis=0)
-        ground_truth = labels[index].numpy()
-        return ground_truth, predicted
-    elif task == "reconstruction":
-        img_dataset = inputs[random.randint(0, len(inputs) - 1)]
-        _, img_gen = (
-            model(img_dataset.unsqueeze_(0).to(device))[0, :, :, :]
-            .cpu()
-            .detach()
-            .numpy()
-        )
-
-        return img_dataset[0, :, :, :].numpy(), img_gen
-
-    elif task == "classification":
-        index = random.randint(0, len(inputs) - 1)
-        ground_truth = labels[index].numpy()
-        _, predicted = model(inputs[index].unsqueeze_(0).to(device))
-        predicted = np.argmax(predicted.cpu().detach().numpy())
-        return ground_truth, predicted
 
 
 def retrain(params: list) -> None:
@@ -868,7 +791,7 @@ def test(params: list) -> None:
 
     _, _, task = get_model_properties(config=config)
 
-    res, to_be_visualized, cm = utils.test_epoch(
+    res, to_be_vizualized, cm = utils.test_epoch(
         model,
         test_loader,
         task=task,
@@ -1009,14 +932,14 @@ def test(params: list) -> None:
             sets_indices=None,
         )
 
-        to_be_visualized = [
+        to_be_vizualized = [
             image_input[np.newaxis, ...],
             ground_truth[np.newaxis, ...],
             predicted[np.newaxis, ...],
         ]
         if task == "segmentation":
             vis.plot_segmentation_images(
-                to_be_visualized=to_be_visualized,
+                to_be_vizualized=to_be_vizualized,
                 confusion_matrix=cm,
                 number_classes=num_classes,
                 ignore_index=ignore_index,
@@ -1026,14 +949,14 @@ def test(params: list) -> None:
             )
         elif task == "reconstruction":
             vis.plot_reconstruction_polsar_images(
-                to_be_visualized=to_be_visualized,
+                to_be_vizualized=to_be_vizualized,
                 logdir=logdir,
                 wandb_log=wandb_log,
             )
 
     elif task == "classification":
         vis.plot_classification_images(
-            to_be_visualized=to_be_visualized,
+            to_be_vizualized=to_be_vizualized,
             logdir=logdir,
             wandb_log=wandb_log,
             confusion_matrix=cm,
@@ -1042,7 +965,7 @@ def test(params: list) -> None:
         )
     elif task == "segmentation":
         vis.plot_segmentation_images(
-            to_be_visualized=to_be_visualized,
+            to_be_vizualized=to_be_vizualized,
             confusion_matrix=cm,
             number_classes=num_classes,
             ignore_index=ignore_index,
