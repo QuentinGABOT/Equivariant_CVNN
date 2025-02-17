@@ -32,11 +32,6 @@ model:
     method: BatchNorm
     track_running_stats: false
   num_layers: 4
-  gumbel_tau:
-    start_value: 5
-    gamma: 0.1
-    start_decay_epoch: 5
-    min_value: 0.00001
 nepochs: 100
 optim:
   algo: AdamW
