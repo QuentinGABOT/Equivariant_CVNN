@@ -27,3 +27,5 @@ To test a model (and get its performances metrics):
 python -m torchtmpl.main test logs/path_to_model 
 
 ```
+
+If you are using the submit-slurm.py script to run the training, make sure to set the number of retrains to 4 (to achieve at least 100 epochs).

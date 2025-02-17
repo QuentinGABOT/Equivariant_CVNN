@@ -1,0 +1,53 @@
+data:
+  batch_size: 100
+  dataset:
+    name: PolSFDataset
+    trainpath: ../datasets/S1SLC
+  transform: LogAmplitude
+  num_workers: 4
+  valid_ratio: 0.15
+  test_ratio: 0.15
+logging:
+  logdir: ./logs
+  wandb:
+    entity: equivariant_cvnn
+    project: s1slc
+loss:
+  name: FocalLoss
+  gamma: 3
+model:
+  activation: modReLU
+  channels_ratio: 16
+  class: ResNet
+  res: true
+  projection:
+    class: ModCtoR
+    global: true
+    softmax: Softmax
+  downsampling: APS
+  upsampling: Null
+  latent_dim: Null
+  dropout : 0.1
+  normalization: 
+    method: BatchNorm
+    track_running_stats: false
+  num_layers: 4
+  gumbel_tau:
+    start_value: 5
+    gamma: 0.1
+    start_decay_epoch: 5
+    min_value: 0.00001
+nepochs: 100
+optim:
+  algo: AdamW
+  params:
+    lr: 0.01
+    weight_decay: 0.0005
+scheduler:
+  algo: StepLR
+  params:
+    step_size: 1000
+    gamma: 1
+pretrained: false
+world_size: 4
+dtype: complex64
