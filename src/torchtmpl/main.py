@@ -485,8 +485,8 @@ def save_model_summary(
 
 
 def retrain(params: list) -> None:
-    if len(params) != 1:
-        logging.error(f"Usage : {sys.argv[0]} retrain <logdir>")
+    if len(params) not in [1, 2]:
+        logging.error(f"Usage : {sys.argv[0]} retrain <logdir> <tmp_logfile>")
         sys.exit(-1)
 
     logdir = pathlib.Path(params[0])
@@ -495,14 +495,14 @@ def retrain(params: list) -> None:
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
         config["pretrained"] = True
-    train(config)
+    log_file = None if len(params) == 1 else params[1]
+    train(config, log_file)
 
 
-def train(params: Union[list, dict]) -> None:
+def train(params: Union[list, dict], log_file=None) -> None:
     """
     Train the model based on the given configuration.
     """
-    log_file = None
     if isinstance(params, list):
         if len(params) not in [1,2]:
             logging.error(f"Usage : {sys.argv[0]} train <config.yaml> <tmp_logfile>")

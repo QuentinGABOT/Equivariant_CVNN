@@ -132,6 +132,7 @@ echo "Training"
 cd $current_dir
 
 logdir=`cat job_id/{job_id}`
+rm -f job_id/{job_id}
 python -m torchtmpl.main {command} $logdir
 
 
@@ -281,4 +282,4 @@ else:
     logdir = sys.argv[2]
     source_path = sys.argv[3]
     job = makejob_test_retrain_with_logdir(commit_id, logdir, source_path, command=command, job_id=None)
-    submit_job(job)
+    job_id = submit_job(job)
