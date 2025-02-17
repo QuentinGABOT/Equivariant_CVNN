@@ -17,7 +17,7 @@ def makejob_train(commit_id, config_path, source_path, dataset_path):
 
     return f"""#!/bin/bash
  
-#SBATCH --job-name=polsf
+#SBATCH --job-name=run
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=10
