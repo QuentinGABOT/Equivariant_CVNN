@@ -365,8 +365,8 @@ class Dense(nn.Module):
         num_classes,
         projection,
         dtype,
+        activation,
         latent_dim=None,
-        activation=None,
         unflatten: bool = False,
     ):
         super(Dense, self).__init__()
@@ -374,14 +374,11 @@ class Dense(nn.Module):
             self.avg_pool = c_nn.AvgPool2d(input_size, input_size)
         elif dtype == torch.float64:
             self.avg_pool = nn.AvgPool2d(input_size, input_size)
+
         self.unflatten = unflatten
-
-        if activation:
-            self.activation = activation
-        else:
-            self.activation = None
-
+        self.activation = activation
         self.projection = projection
+        self.latent_dim = latent_dim
 
         if unflatten:
             assert latent_dim is not None
@@ -396,14 +393,25 @@ class Dense(nn.Module):
                 dim=1, unflattened_size=(in_channels, input_size, input_size)
             )
         else:
-            self.fc_1 = nn.Linear(
-                in_features=in_channels, out_features=num_classes, dtype=dtype
-            )
+            if latent_dim is not None:
+                self.fc_1 = nn.Linear(
+                    in_features=in_channels, out_features=latent_dim, dtype=dtype
+                )
+                self.fc_2 = nn.Linear(
+                    in_features=latent_dim, out_features=num_classes, dtype=dtype
+                )
+            else:
+                self.fc_1 = nn.Linear(
+                    in_features=in_channels, out_features=num_classes, dtype=dtype
+                )
 
     def forward(self, x):
         x_projected = None
         x = torch.flatten(self.avg_pool(x), 1)
         x = self.fc_1(x)
+        if self.latent_dim is not None:
+            x = self.activation(x)
+            x = self.fc_2(x)
 
         if self.unflatten:
             if self.activation:

@@ -186,6 +186,7 @@ class DeepNeuralNetwork(nn.Module):
                         out_channels=num_classes,
                         projection=projection,
                         dtype=dtype,
+
                     )
                 )
 

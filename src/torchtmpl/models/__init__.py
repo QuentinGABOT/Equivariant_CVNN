@@ -150,7 +150,7 @@ def build_model(
             channels_ratio=channels_ratio,
             upsampling=False,
             dense=True,
-            latent_dim=None,
+            latent_dim=latent_dim,
             dropout=dropout,
             res=res,
             skip_connections=False,
