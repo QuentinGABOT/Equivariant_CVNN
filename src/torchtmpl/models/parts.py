@@ -366,7 +366,7 @@ class Dense(nn.Module):
         projection,
         dtype,
         activation,
-        latent_dim=None,
+        latent_dim,
         unflatten: bool = False,
     ):
         super(Dense, self).__init__()
@@ -378,46 +378,31 @@ class Dense(nn.Module):
         self.unflatten = unflatten
         self.activation = activation
         self.projection = projection
-        self.latent_dim = latent_dim
 
         if unflatten:
-            assert latent_dim is not None
-            linear = in_channels * input_size * input_size
-            self.fc_1 = nn.Linear(
-                in_features=in_channels, out_features=latent_dim, dtype=dtype
-            )
-            self.fc_2 = nn.Linear(
-                in_features=latent_dim, out_features=linear, dtype=dtype
-            )
-            self.unflat_1 = nn.Unflatten(
+            out_features = in_channels * input_size * input_size
+            self.unflat = nn.Unflatten(
                 dim=1, unflattened_size=(in_channels, input_size, input_size)
             )
         else:
-            if latent_dim is not None:
-                self.fc_1 = nn.Linear(
-                    in_features=in_channels, out_features=latent_dim, dtype=dtype
-                )
-                self.fc_2 = nn.Linear(
-                    in_features=latent_dim, out_features=num_classes, dtype=dtype
-                )
-            else:
-                self.fc_1 = nn.Linear(
-                    in_features=in_channels, out_features=num_classes, dtype=dtype
-                )
+            out_features = num_classes
+
+        self.fc_1 = nn.Linear(
+            in_features=in_channels, out_features=latent_dim, dtype=dtype
+        )
+        self.fc_2 = nn.Linear(
+            in_features=latent_dim, out_features=out_features, dtype=dtype
+        )
 
     def forward(self, x):
-        x_projected = None
         x = torch.flatten(self.avg_pool(x), 1)
         x = self.fc_1(x)
-        if self.latent_dim is not None:
-            x = self.activation(x)
-            x = self.fc_2(x)
+        x = self.activation(x)
+        x = self.fc_2(x)
 
         if self.unflatten:
-            if self.activation:
-                x = self.activation(x)
-            x = self.fc_2(x)
             x = self.unflat_1(x)
+            x_projected = None
         else:
             x_projected = self.projection(x)
         return x, x_projected
