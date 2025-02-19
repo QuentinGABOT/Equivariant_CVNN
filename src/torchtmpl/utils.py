@@ -907,11 +907,11 @@ def one_forward(model, loader, task, softmax, device, dtype, return_range=False)
 
     # Set the appropriate hook based on the task
     if task == "classification":
-        hook_handle = model.dense[-1].fc_1.register_forward_hook(
+        hook_handle = model.dense_block[-1].fc_1.register_forward_hook(
             get_activation("penultimate")
         )
     elif task == "segmentation":
-        hook_handle = model.decoder[-1].conv.register_forward_hook(
+        hook_handle = model.decoder_block[-1].conv.register_forward_hook(
             get_activation("penultimate")
         )
     else:
