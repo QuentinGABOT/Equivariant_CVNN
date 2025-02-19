@@ -281,5 +281,11 @@ if command == "train":
 else:
     logdir = sys.argv[2]
     source_path = sys.argv[3]
-    job = makejob_test_retrain_with_logdir(commit_id, logdir, source_path, command=command, job_id=None)
+
+    config_path = os.path.join(logdir, "config.yml")
+    with open(config_path, "r") as file:
+        config = yaml.safe_load(file)
+        dataset_path = config["data"]["dataset"]["trainpath"]
+
+    job = makejob_test_retrain_with_logdir(commit_id, logdir, source_path, command=command, dataset_path=dataset_path)
     job_id = submit_job(job)
