@@ -67,7 +67,6 @@ def build_model(
 
     if model == "AutoEncoder":
         return DeepNeuralNetwork(
-            model=model,
             num_channels=num_channels,
             num_classes=None,
             projection=projection,
@@ -91,7 +90,6 @@ def build_model(
 
     elif model == "AutoEncoderWD":
         return DeepNeuralNetwork(
-            model=model,
             num_channels=num_channels,
             num_classes=None,
             projection=projection,
@@ -115,7 +113,6 @@ def build_model(
 
     elif model == "UNet":
         return DeepNeuralNetwork(
-            model=model,
             num_channels=num_channels,
             num_classes=num_classes,
             projection=projection,
@@ -139,7 +136,6 @@ def build_model(
 
     elif model == "ResNet":
         return DeepNeuralNetwork(
-            model=model,
             num_channels=num_channels,
             num_classes=num_classes,
             projection=projection,
@@ -150,7 +146,7 @@ def build_model(
             channels_ratio=channels_ratio,
             upsampling=False,
             dense=True,
-            latent_dim=None,
+            latent_dim=latent_dim,
             dropout=dropout,
             res=res,
             skip_connections=False,

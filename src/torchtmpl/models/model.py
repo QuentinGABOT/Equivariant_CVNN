@@ -11,7 +11,6 @@ UPSAMPLING_FACTOR = 2
 class DeepNeuralNetwork(nn.Module):
     def __init__(
         self,
-        model,
         num_channels,
         num_layers,
         channels_ratio,
@@ -38,12 +37,9 @@ class DeepNeuralNetwork(nn.Module):
             num_classes is not None if dense and not upsampling else True
         ), "num_classes must be provided if dense and not upsampling"
 
-        self.name = model
-        self.n_channels = num_channels
-        self.num_classes = num_classes
         self.upsampling = upsampling
-        self.downsampling_method = downsampling_method
-        self.upsampling_method = upsampling_method
+        self.skip_connections = skip_connections
+        self.dense = dense
 
         # Encoder with doubzling channels
         current_channels = channels_ratio
@@ -54,7 +50,7 @@ class DeepNeuralNetwork(nn.Module):
 
         self.encoder_layers.append(
             DoubleConv(
-                in_channels=self.n_channels,
+                in_channels=num_channels,
                 out_channels=current_channels,
                 activation=activation,
                 normalization_method=normalization_method,
@@ -125,9 +121,9 @@ class DeepNeuralNetwork(nn.Module):
             input_size //= DOWNSAMPLING_FACTOR
             current_channels = out_channels
 
-        self.encoder = nn.Sequential(*self.encoder_layers)
+        self.encoder_block = nn.Sequential(*self.encoder_layers)
 
-        self.bridge = nn.Sequential(*self.bridge_layers)
+        self.bridge_block = nn.Sequential(*self.bridge_layers)
 
         if dense:
             self.dense_layers.append(
@@ -143,7 +139,7 @@ class DeepNeuralNetwork(nn.Module):
                 )
             )
 
-        self.dense = nn.Sequential(*self.dense_layers)
+        self.dense_block = nn.Sequential(*self.dense_layers)
 
         if upsampling:
             # Decoder with halving channels
@@ -189,50 +185,50 @@ class DeepNeuralNetwork(nn.Module):
                     )
                 )
 
-        self.decoder = nn.Sequential(*self.decoder_layers)
+        self.decoder_block = nn.Sequential(*self.decoder_layers)
 
     def forward(self, x):
-        probs = []
-        skip_connections = []
+        list_probs = []
+        list_skip_connections = []
 
-        for enc in self.encoder:
+        for enc in self.encoder_block:
             if isinstance(enc, Down):
                 x, prob = enc(x)
-                probs.append(prob)
+                list_probs.append(prob)
             else:
                 x = enc(x)
-            if self.bridge:
-                skip_connections.append(x)
+            if self.skip_connections:
+                list_skip_connections.append(x)
 
-        if self.bridge:
-            x, prob = self.bridge(x)
-            probs.append(prob)
+        if self.skip_connections:
+            x, prob = self.bridge_block(x)
+            list_probs.append(prob)
 
         if self.dense:
-            x, x_projected = self.dense(x)
+            x, x_projected = self.dense_block(x)
 
-        skip_connections = skip_connections[::-1]
-        probs = probs[::-1]
+        list_skip_connections = list_skip_connections[::-1]
+        list_probs = list_probs[::-1]
 
-        if self.decoder:
-            for idx, dec in enumerate(self.decoder):
+        if self.upsampling:
+            for idx, dec in enumerate(self.decoder_block):
                 if isinstance(dec, Up):
-                    if skip_connections:
-                        skip = skip_connections[idx]
+                    if self.skip_connections:
+                        skip = list_skip_connections[idx]
                     else:
                         skip = None
-                    x = dec(x, skip, probs[idx])
+                    x = dec(x, skip, list_probs[idx])
                 else:
                     x, x_projected = dec(x)
 
         return x, x_projected
 
     def use_checkpointing(self):
-        for i, layer in enumerate(self.encoder):
-            self.encoder[i] = checkpoint.checkpoint(layer)
-        for i, layer in enumerate(self.bridge):
-            self.bridge[i] = checkpoint.checkpoint(layer)
-        for i, layer in enumerate(self.dense):
-            self.dense[i] = checkpoint.checkpoint(layer)
-        for i, layer in enumerate(self.decoder):
-            self.decoder[i] = checkpoint.checkpoint(layer)
+        for i, layer in enumerate(self.encoder_block):
+            self.encoder_block[i] = checkpoint.checkpoint(layer)
+        for i, layer in enumerate(self.bridge_block):
+            self.bridge_block[i] = checkpoint.checkpoint(layer)
+        for i, layer in enumerate(self.dense_block):
+            self.dense_block[i] = checkpoint.checkpoint(layer)
+        for i, layer in enumerate(self.decoder_block):
+            self.decoder_block[i] = checkpoint.checkpoint(layer)
