@@ -26,7 +26,7 @@ model:
     softmax: Softmax
   downsampling: LPD
   upsampling: Null
-  latent_dim: Null
+  latent_dim: 128
   dropout : 0.1
   normalization: 
     method: BatchNorm
