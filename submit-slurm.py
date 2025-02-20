@@ -133,8 +133,13 @@ cd $current_dir
 
 logdir=`cat job_id/{job_id}`
 rm -f job_id/{job_id}
-python -m torchtmpl.main {command} $logdir
 
+if [[ "{command}" == "retrain" ]]; then
+    # The retrain will save its logdir into its job_id file
+    # so that a further retrain or test can get it back
+    python -m torchtmpl.main retrain $logdir job_id/${{SLURM_JOB_ID}}
+else
+    python -m torchtmpl.main test $logdir
 
 if [[ $? != 0 ]]; then
     exit -1
