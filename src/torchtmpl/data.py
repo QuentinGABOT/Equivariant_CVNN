@@ -94,7 +94,7 @@ def stratify_masks(
     return kmeans.labels_
 
 
-def get_dataloaders(data_config: dict, use_cuda: bool, dtype) -> tuple:
+def get_dataloaders(data_config: dict, use_cuda: bool) -> tuple:
     (
         img_size,
         img_stride,
@@ -202,7 +202,10 @@ def get_dataloaders(data_config: dict, use_cuda: bool, dtype) -> tuple:
     )
 
 
-def get_full_image_dataloader(data_config: dict, use_cuda: bool, dtype) -> tuple:
+def get_full_image_dataloader(
+    data_config: dict,
+    use_cuda: bool,
+) -> tuple:
     (
         img_size,
         _,
@@ -272,7 +275,7 @@ def get_full_image_dataloader(data_config: dict, use_cuda: bool, dtype) -> tuple
     wrapped_dataset = GenericDatasetWrapper(base_dataset)
 
     data_loader = DataLoader(
-        wrapped_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        wrapped_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=use_cuda
     )
 
     if name_dataset in ["PolSFDataset", "ALOSDataset"]:

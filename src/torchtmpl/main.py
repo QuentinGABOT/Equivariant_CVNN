@@ -316,7 +316,7 @@ def load(config: dict) -> tuple:
         num_channels,
         img_size,
         ignore_index,
-    ) = dt.get_dataloaders(data_config, use_cuda, dtype)
+    ) = dt.get_dataloaders(data_config, use_cuda)
 
     if len(next(iter(train_loader))) == 2:
         input_size = next(iter(train_loader))[0].shape
@@ -504,7 +504,7 @@ def train(params: Union[list, dict], log_file=None) -> None:
     Train the model based on the given configuration.
     """
     if isinstance(params, list):
-        if len(params) not in [1,2]:
+        if len(params) not in [1, 2]:
             logging.error(f"Usage : {sys.argv[0]} train <config.yaml> <tmp_logfile>")
             sys.exit(-1)
 
@@ -743,7 +743,7 @@ def test(params: list) -> None:
         num_channels,
         img_size,
         ignore_index,
-    ) = dt.get_dataloaders(data_config, use_cuda, dtype)
+    ) = dt.get_dataloaders(data_config, use_cuda)
 
     logging.info("= Model")
 
@@ -822,7 +822,7 @@ def test(params: list) -> None:
                 nsamples_per_cols,
                 nsamples_per_rows,
                 indices,
-            ) = dt.get_full_image_dataloader(data_config, use_cuda, dtype)
+            ) = dt.get_full_image_dataloader(data_config, use_cuda)
 
         else:
             train_dataset = train_loader.dataset
