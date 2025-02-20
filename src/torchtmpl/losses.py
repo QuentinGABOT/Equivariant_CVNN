@@ -1,21 +1,8 @@
 import torch
 import torch.nn as nn
-from torchcvnn.nn.modules.loss import ComplexMSELoss
 import torch.nn.functional as F
 import numpy as np
 from typing import Optional
-
-
-class ComplexMeanSquareError(nn.Module):
-    def __init__(self):
-        super(ComplexMeanSquareError, self).__init__()
-
-    def forward(self, y_true, y_pred):
-
-        # Calculate Mean Square Error
-        mse = torch.mean(torch.square(torch.abs(y_true - y_pred)))
-
-        return mse
 
 
 class FocalLoss(nn.Module):

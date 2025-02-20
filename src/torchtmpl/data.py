@@ -188,7 +188,12 @@ def get_dataloaders(data_config: dict, use_cuda: bool) -> tuple:
     )
 
     num_channels = get_num_channels(train_loader)
-    img_size = train_loader.dataset[0][0].shape[-1]
+    print(f"Number of channels: {num_channels}")
+
+    img_size = get_img_size(train_loader)
+    print(f"Image size: {img_size}")
+
+    input_size = (1, num_channels, img_size, img_size)
 
     return (
         train_loader,
@@ -198,6 +203,7 @@ def get_dataloaders(data_config: dict, use_cuda: bool) -> tuple:
         num_classes,
         num_channels,
         img_size,
+        input_size,
         ignore_index,
     )
 
@@ -241,6 +247,7 @@ def get_full_image_dataloader(
             input_transform,
             valid_ratio,
             test_ratio,
+            crop=True,
         )
         nsamples_per_cols = base_dataset.nsamples_per_cols
         nsamples_per_rows = base_dataset.nsamples_per_rows
@@ -275,7 +282,11 @@ def get_full_image_dataloader(
     wrapped_dataset = GenericDatasetWrapper(base_dataset)
 
     data_loader = DataLoader(
-        wrapped_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=use_cuda
+        wrapped_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=use_cuda,
     )
 
     if name_dataset in ["PolSFDataset", "ALOSDataset"]:
@@ -335,8 +346,9 @@ def prepare_alos_dataset(
     input_transform,
     valid_ratio,
     test_ratio,
+    crop=False,
 ):
-    if "crop" in data_config.keys():
+    if crop:
         crop_coordinates = (
             (data_config["crop"]["start_row"], data_config["crop"]["start_col"]),
             (data_config["crop"]["end_row"], data_config["crop"]["end_col"]),
@@ -520,7 +532,20 @@ def get_num_channels(loader):
     """
     Get the number of channels from the first image in the dataset.
     """
-    return loader.dataset[0][0].shape[0]
+    if isinstance(loader.dataset[0], tuple):
+        return loader.dataset[0][0].shape[0]
+    else:
+        return loader.dataset[0].shape[0]
+
+
+def get_img_size(loader):
+    """
+    Get the image size from the first image in the dataset.
+    """
+    if isinstance(loader.dataset[0], tuple):
+        return loader.dataset[0][0].shape[-1]
+    else:
+        return loader.dataset[0].shape[-1]
 
 
 def reassemble_image(

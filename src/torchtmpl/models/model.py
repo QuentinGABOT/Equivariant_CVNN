@@ -32,6 +32,7 @@ class DeepNeuralNetwork(nn.Module):
         dense=False,
     ):
         super(DeepNeuralNetwork, self).__init__()
+
         assert dense or upsampling, "Either dense or upsampling must be provided"
         assert (
             num_classes is not None if dense and not upsampling else True

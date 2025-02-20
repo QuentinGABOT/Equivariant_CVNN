@@ -277,7 +277,7 @@ def load(config: dict) -> tuple:
 
     if dtype == torch.complex64:
         projection = config["model"]["projection"]
-        softmax = get_softmax(projection["softmax"], projection["class"])
+        softmax = get_softmax(projection)
         if projection["global"]:
             class_name = projection["class"]
             projection = globals()[class_name]()
@@ -315,13 +315,9 @@ def load(config: dict) -> tuple:
         num_classes,
         num_channels,
         img_size,
+        input_size,
         ignore_index,
     ) = dt.get_dataloaders(data_config, use_cuda)
-
-    if len(next(iter(train_loader))) == 2:
-        input_size = next(iter(train_loader))[0].shape
-    else:
-        input_size = next(iter(train_loader)).shape
 
     # Build the model
     logging.info("= Model")
@@ -742,6 +738,7 @@ def test(params: list) -> None:
         num_classes,
         num_channels,
         img_size,
+        input_size,
         ignore_index,
     ) = dt.get_dataloaders(data_config, use_cuda)
 
@@ -749,7 +746,7 @@ def test(params: list) -> None:
 
     if dtype == torch.complex64:
         projection = config["model"]["projection"]
-        softmax = get_softmax(projection["softmax"], projection["class"])
+        softmax = get_softmax(projection)
         if projection["global"]:
             class_name = projection["class"]
             projection = globals()[class_name]()
@@ -997,11 +994,11 @@ def validate_shift_invariance(
         _ = model(dummy_input)
 
 
-def get_softmax(softmax, projection):
-    if projection in ["ModCtoR", "PolyCtoR", "MLPCtoR"]:
+def get_softmax(projection):
+    if projection["class"] in ["ModCtoR", "PolyCtoR", "MLPCtoR"]:
         return Softmax()
     else:
-        return globals()[softmax]()
+        return globals()[projection["softmax"]]()
 
 
 def get_model_properties(config) -> tuple:
