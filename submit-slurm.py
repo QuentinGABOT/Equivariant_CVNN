@@ -142,6 +142,7 @@ if [[ "{command}" == "retrain" ]]; then
     python -m torchtmpl.main retrain $logdir job_id/${{SLURM_JOB_ID}}
 else
     python -m torchtmpl.main test $logdir
+fi
 
 if [[ $? != 0 ]]; then
     exit -1
