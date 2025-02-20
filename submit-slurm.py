@@ -73,7 +73,9 @@ fi
 """
 
 
-def makejob_test_retrain_without_logdir(commit_id, source_path, dataset_path, job_id, command):
+def makejob_test_retrain_without_logdir(
+    commit_id, source_path, dataset_path, job_id, command
+):
     # Determine the rsync command based on the presence of "MSTAR" in source_path
     rsync_command = (
         f"rsync -r {source_path}/* {dataset_path}"
@@ -133,8 +135,13 @@ cd $current_dir
 
 logdir=`cat job_id/{job_id}`
 rm -f job_id/{job_id}
-python -m torchtmpl.main {command} $logdir
 
+if [[ "{command}" == "retrain" ]]; then
+    # The retrain will save its logdir into its job_id file
+    # so that a further retrain or test can get it back
+    python -m torchtmpl.main retrain $logdir job_id/${{SLURM_JOB_ID}}
+else
+    python -m torchtmpl.main test $logdir
 
 if [[ $? != 0 ]]; then
     exit -1
@@ -142,7 +149,10 @@ fi
 """
     return sbatch
 
-def makejob_test_retrain_with_logdir(commit_id, logdir, source_path, command, dataset_path):
+
+def makejob_test_retrain_with_logdir(
+    commit_id, logdir, source_path, command, dataset_path
+):
 
     # Determine the rsync command based on the presence of "MSTAR" in source_path
     rsync_command = (
@@ -212,7 +222,7 @@ fi
 def submit_job(job):
     with open("job.sbatch", "w") as fp:
         fp.write(job)
-    job_id = subprocess.check_output("sbatch job.sbatch | cut -d \" \" -f 4", shell=True)
+    job_id = subprocess.check_output('sbatch job.sbatch | cut -d " " -f 4', shell=True)
     print(f"Submitted job {job_id.decode().strip()}")
     return job_id.decode().strip()
 
@@ -243,7 +253,7 @@ print(f"I will be using the commit id {commit_id}")
 # Ensure the log directory exists
 os.system("mkdir -p logslurms")
 
-if len(sys.argv) not in [5,4]:
+if len(sys.argv) not in [5, 4]:
     print(f"Usage : ")
     print(f" {sys.argv[0]} train config.yaml sourcepath <numruns>")
     print(f" {sys.argv[0]} <retrain|test> logdir sourcepath")
@@ -271,12 +281,29 @@ if command == "train":
     os.system("mkdir -p job_id")
 
     # Launch the batch job
-    job = makejob_train(commit_id, config_path=tmp_config_path, source_path=source_path, dataset_path=dataset_path)
+    job = makejob_train(
+        commit_id,
+        config_path=tmp_config_path,
+        source_path=source_path,
+        dataset_path=dataset_path,
+    )
     job_id = submit_job(job)
     for i in range(numruns - 1):
-        job = makejob_test_retrain_without_logdir(commit_id, source_path=source_path, command="retrain", job_id=job_id, dataset_path=dataset_path)
+        job = makejob_test_retrain_without_logdir(
+            commit_id,
+            source_path=source_path,
+            command="retrain",
+            job_id=job_id,
+            dataset_path=dataset_path,
+        )
         job_id = submit_job(job)
-    job = makejob_test_retrain_without_logdir(commit_id, source_path=source_path, command="test", job_id=job_id, dataset_path=dataset_path)
+    job = makejob_test_retrain_without_logdir(
+        commit_id,
+        source_path=source_path,
+        command="test",
+        job_id=job_id,
+        dataset_path=dataset_path,
+    )
     job_id = submit_job(job)
 else:
     logdir = sys.argv[2]
@@ -287,5 +314,7 @@ else:
         config = yaml.safe_load(file)
         dataset_path = config["data"]["dataset"]["trainpath"]
 
-    job = makejob_test_retrain_with_logdir(commit_id, logdir, source_path, command=command, dataset_path=dataset_path)
+    job = makejob_test_retrain_with_logdir(
+        commit_id, logdir, source_path, command=command, dataset_path=dataset_path
+    )
     job_id = submit_job(job)

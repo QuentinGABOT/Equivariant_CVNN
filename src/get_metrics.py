@@ -72,16 +72,24 @@ def log_collected_runs_to_tex(collected_runs, dataset):
         f.write("\\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|}\n")
         f.write("\\hline\n")
         f.write(
-            "Model & Best Loss & OA (\%) & Kappa (\%) & F1 (\%) & Precision (\%) & Recall (\%) & IoU (\%) & Cir. S. (\%) & Std. S. (\%) \\\\\n"
+            "Model & Best Loss & OA (\\%) & Kappa (\\%) & F1 (\\%) & Precision (\\%) & Recall (\\%) & IoU (\\%) & Cir. S. (\\%) & Std. S. (\\%) \\\\\n"
         )
         f.write("\\hline\n")
 
         for key, runs in collected_runs.items():
+            # If more than 5 runs, filter out the worst ones based on Best Loss (lower is better)
+            if len(runs["Best Loss"]) > 5:
+                indices = sorted(
+                    range(len(runs["Best Loss"])), key=lambda i: runs["Best Loss"][i]
+                )[:5]
+                for metric in runs:
+                    runs[metric] = [runs[metric][i] for i in indices]
+
             if "complex64" in key:
-                dtype = "$\mathbb{C}$"
+                dtype = "$\\mathbb{C}$"
                 key = key.replace("_complex64_", "_")
             elif "float64" in key:
-                dtype = "$\mathbb{R}$"
+                dtype = "$\\mathbb{R}$"
                 key = key.replace("_float64_", "_")
             else:
                 raise ValueError(f"Unknown dtype in {key}")
@@ -103,7 +111,7 @@ def log_collected_runs_to_tex(collected_runs, dataset):
             f1_std = np.std(f1)
             precision = runs["test_macro_precision"]
             precision_mean = sum(precision) / len(precision)
-            precision_mean = np.std(precision)
+            precision_std = np.std(precision)
             recall = runs["test_macro_recall"]
             recall_mean = sum(recall) / len(recall)
             recall_std = np.std(recall)
@@ -116,9 +124,13 @@ def log_collected_runs_to_tex(collected_runs, dataset):
             std_s = runs["test_std_consistency"]
             std_s_mean = sum(std_s) / len(std_s)
             std_s_std = np.std(std_s)
-            # Write the table row
+
             f.write(
-                f"{model} & {dtype} & ${round(best_loss_mean, 2)} \\pm {round(best_loss_std,2)}$ & ${round(oa_mean, 2)} \\pm {round(oa_std,2)}$ & ${round(kappa_mean, 2)} \\pm {round(kappa_std,2)}$ & ${round(f1_mean, 2)} \\pm {round(f1_std,2)}$ & ${round(precision_mean, 2)} \\pm {round(precision_mean,2)}$ & ${round(recall_mean, 2)} \\pm {round(recall_std,2)}$ & ${round(iou_mean, 2)} \\pm {round(iou_std,2)}$ & ${round(cir_s_mean, 2)} \\pm {round(cir_s_std,2)}$ & ${round(std_s_mean, 2)} \\pm {round(std_s_std,2)}$ \\\\\n"
+                f"{model} & {dtype} & ${round(best_loss_mean, 2)} \\pm {round(best_loss_std,2)}$ & "
+                f"${round(oa_mean, 2)} \\pm {round(oa_std,2)}$ & ${round(kappa_mean, 2)} \\pm {round(kappa_std,2)}$ & "
+                f"${round(f1_mean, 2)} \\pm {round(f1_std,2)}$ & ${round(precision_mean, 2)} \\pm {round(precision_std,2)}$ & "
+                f"${round(recall_mean, 2)} \\pm {round(recall_std,2)}$ & ${round(iou_mean, 2)} \\pm {round(iou_std,2)}$ & "
+                f"${round(cir_s_mean, 2)} \\pm {round(cir_s_std,2)}$ & ${round(std_s_mean, 2)} \\pm {round(std_s_std,2)}$ \\\\\n"
             )
             f.write("\\hline\n")
         f.write("\\end{tabular}\n")
@@ -160,9 +172,6 @@ def get_collected_runs(dataset):
         if "Best Loss" not in summary:
             print("Skip missing metrics")
             print(run.name)
-
-            print(summary)
-            input()
             continue
 
         # print(run.config)

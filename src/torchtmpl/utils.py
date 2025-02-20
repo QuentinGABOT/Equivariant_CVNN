@@ -374,8 +374,6 @@ def apply_kmeans(tensors, labels):
 
 def standard_shift_consistency(model, inputs, task, device):
 
-    inputs = Variable(inputs).to(device)
-
     if task == "segmentation" or task == "reconstruction":
         off0 = np.random.randint(1, 9)
         off1 = np.random.randint(1, 9)
