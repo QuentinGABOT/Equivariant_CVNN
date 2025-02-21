@@ -461,7 +461,7 @@ def downsampling_lpf(in_channels, out_channels, downsampling_factor):
         partial(
             Decimation,
             antialias_layer=partial(
-                LowPassFilter, filter_size=3, padding="valid", padding_mode="circular"
+                LowPassFilter, filter_size=3, padding="same", padding_mode="circular"
             ),
         ),
         p_ch=in_channels,
@@ -477,7 +477,7 @@ def upsampling_lpu(in_channels, softmax, upsampling_factor):
             PolyphaseInvariantUp2D,
             component_selection=LPS_u,
             antialias_layer=partial(
-                LowPassFilter, filter_size=3, padding="valid", padding_mode="circular"
+                LowPassFilter, filter_size=3, padding="same", padding_mode="circular"
             ),
         ),
         p_ch=in_channels,
