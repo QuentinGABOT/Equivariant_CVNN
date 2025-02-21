@@ -48,7 +48,7 @@ class LowPassFilter(nn.Module):
             raise ValueError("Filter size must be 1-7", self.filter_size)
 
         filt = a * a.T
-        filt = torch.Tensor(filt / np.sum(filt)).type(torch.float64)
+        filt = torch.Tensor(filt / np.sum(filt))
         filt *= filter_scale**2
         self.register_buffer(
             "filt", filt[None, None, :, :].repeat(self.channels, 1, 1, 1)
@@ -75,16 +75,18 @@ class LowPassFilter(nn.Module):
         )
 
     def forward(self, inp):
+        filt = self.filt.to(inp.real.dtype)
+
         if self.padding != "valid":
             inp = F.pad(inp, self.pad_tuple, self.padding_mode)
 
         if inp.dtype == torch.float64:
-            return F.conv2d(inp, self.filt, groups=inp.shape[1])
+            return F.conv2d(inp, filt, groups=inp.shape[1])
         elif inp.dtype in [torch.complex64, torch.complex128]:
             if inp.dtype == torch.complex128:
                 inp = inp.type(torch.complex64)
-            return F.conv2d(inp.real, self.filt, groups=inp.shape[1]) + 1j * F.conv2d(
-                inp.imag, self.filt, groups=inp.shape[1]
+            return F.conv2d(inp.real, filt, groups=inp.shape[1]) + 1j * F.conv2d(
+                inp.imag, filt, groups=inp.shape[1]
             )
         else:
             raise ValueError("Input must be of type float64 or complex64", inp.dtype)

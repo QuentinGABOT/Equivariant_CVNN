@@ -916,11 +916,10 @@ def plot_synchrony_images(
 
 def plot_reconstruction_polsar_images(
     to_be_vizualized: list,
-    num_channels: int,
     logdir: str,
     wandb_log: bool,
 ) -> None:
-    num_samples = to_be_vizualized.shape[0]  # Number of samples
+    num_samples = to_be_vizualized[0].shape[0]  # Number of samples
     ncols = 12  # Number of plots per sample
     fig, axes = plt.subplots(
         nrows=num_samples,
@@ -950,13 +949,13 @@ def plot_reconstruction_polsar_images(
     ]
 
     for i in range(num_samples):
+        img = to_be_vizualized[0][i]
+        pred = to_be_vizualized[1][i]
+
         idx = 0
 
-        g_t = to_be_vizualized[i, 0]
-        pred = to_be_vizualized[i, 1]
-
         # Amplitude images (Pauli and Krogager basis)
-        img_ground_truth = exp_amplitude_transform(g_t).numpy().transpose(1, 2, 0)
+        img_ground_truth = exp_amplitude_transform(img).numpy().transpose(1, 2, 0)
         img_predicted = exp_amplitude_transform(pred).numpy().transpose(1, 2, 0)
 
         pauli_img_ground_truth = pauli_transform(img_ground_truth).transpose(1, 2, 0)
@@ -994,7 +993,7 @@ def plot_reconstruction_polsar_images(
 
         # Angular distance per channel
         channels = ["HH", "HV", "VV"]
-        for ch in range(num_channels):
+        for ch in range(len(channels)):
             angular_distance_img = plot_angular_distance(
                 img_ground_truth[:, :, ch], img_predicted[:, :, ch]
             )
@@ -1039,7 +1038,9 @@ def plot_reconstruction_polsar_images(
         axes[i][idx].axis("off")
         idx += 1
 
-        confusion_matrix = skm.confusion_matrix(h_alpha_gt, h_alpha_pred)
+        confusion_matrix = skm.confusion_matrix(
+            h_alpha_gt.ravel(), h_alpha_pred.ravel()
+        )
         # Confusion matrix
         sns.heatmap(
             confusion_matrix.round(decimals=3),

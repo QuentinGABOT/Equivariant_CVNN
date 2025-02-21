@@ -820,6 +820,7 @@ def test(params: list) -> None:
                 nsamples_per_rows,
                 indices,
             ) = dt.get_full_image_dataloader(data_config, use_cuda)
+            is_wrapped = True
 
         else:
             train_dataset = train_loader.dataset
@@ -839,6 +840,16 @@ def test(params: list) -> None:
                 num_workers=config["data"]["num_workers"],
                 pin_memory=use_cuda,
             )
+            is_wrapped = False
+
+        if (
+            isinstance(projection, PolyCtoR)
+            and (config["model"]["projection"]["global"])
+            and (dtype == torch.complex64)
+        ):
+            return_range = True
+        else:
+            return_range = False
 
         (
             reconstructed_tensors,
@@ -852,15 +863,12 @@ def test(params: list) -> None:
             task,
             device=device,
             softmax=softmax,
-            return_range=True,
+            is_wrapped=is_wrapped,
+            return_range=return_range,
             dtype=dtype,
         )
 
-        if (
-            isinstance(projection, PolyCtoR)
-            and (config["model"]["projection"]["global"])
-            and (dtype == torch.complex64)
-        ):
+        if return_range:
             vis.plot_projection_interactive(
                 projection.poly,
                 path=logdir,
@@ -885,25 +893,23 @@ def test(params: list) -> None:
         indice_tensors = []
 
         for data in tqdm.tqdm(data_loader):
-            image_tensors.extend(data[0].cpu().detach().numpy())
-            ground_truth_tensors.extend(data[1].cpu().detach().numpy())
-            indice_tensors.extend(data[2].cpu().detach().numpy())
+            img_tensor = data[0].cpu().detach().numpy()
+            image_tensors.extend(img_tensor)
+            grd_truth = (
+                None
+                if isinstance(test_loader.dataset.dataset, ALOSDataset)
+                else data[1].cpu().detach().numpy()
+            )
+            if grd_truth is not None:
+                ground_truth_tensors.extend(grd_truth)
+            ind_tensor = (
+                data[1].cpu().detach().numpy()
+                if isinstance(test_loader.dataset.dataset, ALOSDataset)
+                else data[2].cpu().detach().numpy()
+            )
+            indice_tensors.extend(ind_tensor)
 
-        ground_truth, sets_masks = dt.reassemble_image(
-            segments=ground_truth_tensors,
-            samples_per_col=nsamples_per_cols,
-            samples_per_row=nsamples_per_rows,
-            num_channels=(
-                ground_truth_tensors[0].shape[0]
-                if len(ground_truth_tensors[0].shape) > 2
-                else 1
-            ),
-            segment_size=config["data"]["img_size"],
-            real_indices=indice_tensors,
-            sets_indices=indices,
-        )
-
-        image_input, _ = dt.reassemble_image(
+        image_input, sets_masks = dt.reassemble_image(
             segments=image_tensors,
             samples_per_col=nsamples_per_cols,
             samples_per_row=nsamples_per_rows,
@@ -915,7 +921,7 @@ def test(params: list) -> None:
             sets_indices=None,
         )
 
-        predicted, _ = dt.reassemble_image(
+        predicted, sets_masks = dt.reassemble_image(
             segments=reconstructed_tensors,
             samples_per_col=nsamples_per_cols,
             samples_per_row=nsamples_per_rows,
@@ -929,11 +935,32 @@ def test(params: list) -> None:
             sets_indices=None,
         )
 
-        to_be_vizualized = [
-            image_input[np.newaxis, ...],
-            ground_truth[np.newaxis, ...],
-            predicted[np.newaxis, ...],
-        ]
+        if isinstance(test_loader.dataset.dataset, (PolSFDataset, Bretigny)):
+            ground_truth, _ = dt.reassemble_image(
+                segments=ground_truth_tensors,
+                samples_per_col=nsamples_per_cols,
+                samples_per_row=nsamples_per_rows,
+                num_channels=(
+                    ground_truth_tensors[0].shape[0]
+                    if len(ground_truth_tensors[0].shape) > 2
+                    else 1
+                ),
+                segment_size=config["data"]["img_size"],
+                real_indices=indice_tensors,
+                sets_indices=indices,
+            )
+            to_be_vizualized = [
+                image_input[np.newaxis, ...],
+                ground_truth[np.newaxis, ...],
+                predicted[np.newaxis, ...],
+            ]
+
+        else:
+            to_be_vizualized = [
+                image_input[np.newaxis, ...],
+                predicted[np.newaxis, ...],
+            ]
+
         if task == "segmentation":
             vis.plot_segmentation_images(
                 to_be_vizualized=to_be_vizualized,

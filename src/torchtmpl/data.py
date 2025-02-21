@@ -39,8 +39,11 @@ class GenericDatasetWrapper(Dataset):
         Returns:
             A tuple containing (data, target, index).
         """
-        data, target = self.dataset[index]
-        return data, target, index
+        data = self.dataset[index]
+        if isinstance(data, tuple):
+            return data[0], data[1], index
+        else:
+            return data, index
 
     def __len__(self):
         """
@@ -194,6 +197,7 @@ def get_dataloaders(data_config: dict, use_cuda: bool) -> tuple:
     print(f"Image size: {img_size}")
 
     input_size = (1, num_channels, img_size, img_size)
+    print(f"Input size: {input_size}")
 
     return (
         train_loader,
@@ -278,7 +282,6 @@ def get_full_image_dataloader(
         )
         nsamples_per_cols = base_dataset.alos_dataset.nsamples_per_cols
         nsamples_per_rows = base_dataset.alos_dataset.nsamples_per_rows
-
     wrapped_dataset = GenericDatasetWrapper(base_dataset)
 
     data_loader = DataLoader(
@@ -294,12 +297,7 @@ def get_full_image_dataloader(
     else:
         indices = None
 
-    return (
-        data_loader,
-        nsamples_per_cols,
-        nsamples_per_rows,
-        indices,
-    )
+    return (data_loader, nsamples_per_cols, nsamples_per_rows, indices)
 
 
 def extract_data_config(data_config: dict) -> tuple:

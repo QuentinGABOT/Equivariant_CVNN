@@ -889,7 +889,7 @@ def test_epoch(
     return metrics, to_be_vizualized, conf_matrix_accum
 
 
-def one_forward(model, loader, task, softmax, device, dtype, return_range=False):
+def one_forward(model, loader, task, softmax, device, dtype, is_wrapped, return_range):
     outputs = []
     model.eval()
     model.to(device)
@@ -904,39 +904,48 @@ def one_forward(model, loader, task, softmax, device, dtype, return_range=False)
         return hook
 
     # Set the appropriate hook based on the task
-    if task == "classification":
-        hook_handle = model.dense_block[-1].fc_1.register_forward_hook(
-            get_activation("penultimate")
-        )
-    elif task == "segmentation":
-        hook_handle = model.decoder_block[-1].conv.register_forward_hook(
-            get_activation("penultimate")
-        )
+    if task != "reconstruction":
+        latent_features = []
+        ground_truth = []
+
+        if task == "classification":
+            hook_handle = model.dense_block[-1].fc_1.register_forward_hook(
+                get_activation("penultimate")
+            )
+        elif task == "segmentation":
+            hook_handle = model.decoder_block[-1].conv.register_forward_hook(
+                get_activation("penultimate")
+            )
     else:
         hook_handle = None
+        latent_features = None
+        ground_truth = None
 
-    latent_features = []
-    ground_truth = []
+    if return_range:
+        range_values = {"real_min": 0, "real_max": 0, "imag_min": 0, "imag_max": 0}
+    else:
+        range_values = None
+
     list_of_indices = []
 
-    range_values = {"real_min": 0, "real_max": 0, "imag_min": 0, "imag_max": 0}
-
     with torch.no_grad():
-        for _, data in enumerate(tqdm.tqdm(loader)):
+        for data in tqdm.tqdm(loader):
 
-            # Handle different data structures (tuple, list, or otherwise)
-            if isinstance(data, (tuple, list)):
+            if is_wrapped:
                 if len(data) == 2:
-                    inputs, labels = data  # For standard datasets
+                    inputs, idx = data
                 elif len(data) == 3:
-                    inputs, labels, idx = data  # For wrapped datasets
+                    inputs, labels, idx = data
                     list_of_indices.extend(idx.cpu().numpy().tolist())
                 else:
                     raise ValueError("Unexpected data format in loader.")
             else:
-                inputs = data
-                labels = None
-            # Need to adapt the wrapper and the collect of the indices for reconstruction datasets
+                if len(data) == 1:
+                    inputs = data
+                elif len(data) == 2:
+                    inputs, labels = data
+                else:
+                    raise ValueError("Unexpected data format in loader.")
 
             inputs = Variable(inputs).to(device)
 
@@ -986,9 +995,11 @@ def one_forward(model, loader, task, softmax, device, dtype, return_range=False)
 
             if task in ["classification", "segmentation"]:
                 pred_outputs = softmax(pred_outputs).argmax(dim=1).cpu().numpy()
+            else:
+                pred_outputs = pred_outputs.cpu().numpy()
             outputs.extend(pred_outputs)
-
-    hook_handle.remove()
+    if hook_handle is not None:
+        hook_handle.remove()
 
     if return_range:
         range_values["real_min"] /= len(loader)
