@@ -48,7 +48,7 @@ class LowPassFilter(nn.Module):
             raise ValueError("Filter size must be 1-7", self.filter_size)
 
         filt = a * a.T
-        filt = torch.Tensor(filt / np.sum(filt))
+        filt = torch.Tensor(filt / np.sum(filt)).type(torch.float64)
         filt *= filter_scale**2
         self.register_buffer(
             "filt", filt[None, None, :, :].repeat(self.channels, 1, 1, 1)
@@ -58,10 +58,8 @@ class LowPassFilter(nn.Module):
         if self.padding == "valid":
             self.pad_tuple = None
         elif self.padding == "same":
-            _pad = (self.filter_size - 1) / 2
-            _pad_l = int(np.floor(_pad))
-            _pad_r = int(np.ceil(_pad))
-            self.pad_tuple = (_pad_l, _pad_r, _pad_l, _pad_r)
+            _pad = (self.filter_size - 1) // 2
+            self.pad_tuple = (_pad, _pad, _pad, _pad)
         else:
             raise ValueError(f"padding must be one of {_allowed_padding}", self.padding)
 
