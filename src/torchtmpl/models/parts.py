@@ -240,15 +240,15 @@ class Down(nn.Module):
         )
 
     def forward(self, x):
-        prob = None
+
         if self.downsampling_method is not None:
             if isinstance(self.downsampling_method, PolyphaseInvariantDown2D):
                 x, prob = self.downsampling_method(x, ret_prob=True)
-            elif isinstance(
-                self.downsampling_method,
-                (c_nn.MaxPool2d, nn.MaxPool2d, c_nn.AvgPool2d, nn.AvgPool2d),
-            ):
+            else:
+                prob = None
                 x = self.downsampling_method(x)
+        else:
+            prob = None
         x = self.conv_layer(x)
 
         return x, prob
@@ -325,13 +325,10 @@ class Up(nn.Module):
         )
 
     def forward(self, x1, x2=None, prob=None):
-        if isinstance(
-            self.upsampling_method,
-            (c_nn.ConvTranspose2d, nn.ConvTranspose2d, nn.Upsample, c_nn.Upsample),
-        ):
-            x1 = self.upsampling_method(x1)
-        elif isinstance(self.upsampling_method, PolyphaseInvariantUp2D):
+        if isinstance(self.upsampling_method, PolyphaseInvariantUp2D):
             x1 = self.upsampling_method(x1, prob=prob)
+        else:
+            x1 = self.upsampling_method(x1)
         x = concat(x1, x2)
         x = self.conv_layer(x)
 
@@ -476,9 +473,15 @@ def downsampling_lpf(in_channels, out_channels, downsampling_factor):
 
 def upsampling_lpu(in_channels, softmax, upsampling_factor):
     return set_unpool(
-        partial(PolyphaseInvariantUp2D, component_selection=LPS_u),
+        partial(
+            PolyphaseInvariantUp2D,
+            component_selection=LPS_u,
+            antialias_layer=partial(
+                LowPassFilter, filter_size=3, padding="valid", padding_mode="circular"
+            ),
+        ),
         p_ch=in_channels,
-        no_antialias=True,
+        no_antialias=False,
         softmax=softmax,
         stride=upsampling_factor,
     )
