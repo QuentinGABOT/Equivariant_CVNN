@@ -368,5 +368,5 @@ class Decimation(nn.Module):
             x = self._antialias_layer(x)
 
         # Downsample
-        x = x[:, :, :: self.stride, :: self.stride]
+        x = x[:, :, 1:: self.stride, 1:: self.stride]
         return x
