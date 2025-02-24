@@ -33,7 +33,7 @@ def build_model(
         "AvgPool",
         "MaxPool",
         "LPD",
-        "APS",
+        "APD",
         "LPF",
         "StridedConv",
         None,
@@ -41,6 +41,7 @@ def build_model(
     assert upsampling_method in [
         "ConvTranspose",
         "Upsample",
+        "APU",
         "LPU",
         None,
     ], "Upsampling method not implemented"

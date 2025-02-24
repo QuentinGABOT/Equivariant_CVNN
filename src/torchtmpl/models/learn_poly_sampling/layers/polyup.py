@@ -31,7 +31,7 @@ def unpool_multistage(x, x_layer, p_dict, scale_factor, unpool_layer):
 
 
 # Set unpool
-def set_unpool(unpool_layer, p_ch, softmax, stride, no_antialias=False):
+def set_unpool(unpool_layer, p_ch, stride, softmax=None, no_antialias=False):
     if unpool_layer.func.__name__ == "PolyphaseInvariantUp2D":
         # Check valid functions
         assert unpool_layer.keywords["component_selection"].__name__ in [
@@ -114,7 +114,7 @@ class PolyphaseInvariantUp2D(nn.Module):
     def __init__(
         self,
         component_selection,
-        softmax,
+        softmax=None,
         get_samples=None,
         comp_convex=False,
         stride: int = 2,

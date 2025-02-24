@@ -75,6 +75,9 @@ class LowPassFilter(nn.Module):
         )
 
     def forward(self, inp):
+        if inp.dtype == torch.complex128:
+            inp = inp.type(torch.complex64)
+
         filt = self.filt.to(inp.real.dtype)
 
         if self.padding != "valid":
@@ -82,9 +85,7 @@ class LowPassFilter(nn.Module):
 
         if inp.dtype == torch.float64:
             return F.conv2d(inp, filt, groups=inp.shape[1])
-        elif inp.dtype in [torch.complex64, torch.complex128]:
-            if inp.dtype == torch.complex128:
-                inp = inp.type(torch.complex64)
+        elif inp.dtype == torch.complex64:
             return F.conv2d(inp.real, filt, groups=inp.shape[1]) + 1j * F.conv2d(
                 inp.imag, filt, groups=inp.shape[1]
             )

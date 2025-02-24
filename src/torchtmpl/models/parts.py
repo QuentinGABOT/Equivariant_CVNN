@@ -12,6 +12,7 @@ from .learn_poly_sampling.layers import (
     LPS_u,
     Decimation,
     max_p_norm,
+    max_p_norm_u,
 )
 from .learn_poly_sampling.layers.lowpass_filter import LowPassFilter
 from .learn_poly_sampling.layers.polydown import set_pool
@@ -199,8 +200,8 @@ class Down(nn.Module):
                 dtype=dtype,
                 downsampling_factor=downsampling_factor,
             )
-        elif downsampling_method == "APS":
-            self.downsampling_method = downsampling_aps(
+        elif downsampling_method == "APD":
+            self.downsampling_method = downsampling_apd(
                 in_channels=in_channels,
                 out_channels=out_channels,
                 downsampling_factor=downsampling_factor,
@@ -301,7 +302,10 @@ class Up(nn.Module):
                     dtype=dtype,
                 )
             in_channels = out_channels
-
+        elif upsampling_method == "APU":
+            self.upsampling_method = upsampling_apu(
+                in_channels, upsampling_factor=upsampling_factor
+            )
         elif upsampling_method == "LPU":
             self.upsampling_method = upsampling_lpu(
                 in_channels, softmax=softmax, upsampling_factor=upsampling_factor
@@ -441,7 +445,7 @@ def downsampling_lpd(
     )
 
 
-def downsampling_aps(in_channels, out_channels, downsampling_factor):
+def downsampling_apd(in_channels, out_channels, downsampling_factor):
     return set_pool(
         partial(
             PolyphaseInvariantDown2D,
@@ -468,6 +472,22 @@ def downsampling_lpf(in_channels, out_channels, downsampling_factor):
         h_ch=out_channels,
         no_antialias=False,
         stride=downsampling_factor,
+    )
+
+
+def upsampling_apu(in_channels, upsampling_factor):
+    return set_unpool(
+        partial(
+            PolyphaseInvariantUp2D,
+            component_selection=max_p_norm_u,
+            antialias_layer=partial(
+                LowPassFilter, filter_size=3, padding="same", padding_mode="circular"
+            ),
+        ),
+        p_ch=in_channels,
+        no_antialias=False,
+        stride=upsampling_factor,
+        softmax=None,
     )
 
 
