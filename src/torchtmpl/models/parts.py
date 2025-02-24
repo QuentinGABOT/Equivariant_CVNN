@@ -402,7 +402,7 @@ class Dense(nn.Module):
         x = self.fc_2(x)
 
         if self.unflatten:
-            x = self.unflat_1(x)
+            x = self.unflat(x)
             x_projected = None
         else:
             x_projected = self.projection(x)
