@@ -24,7 +24,7 @@ model:
     class: ModCtoR
     global: true
     softmax: Softmax
-  downsampling: APS
+  downsampling: APD
   upsampling: Null
   latent_dim: 128
   dropout : 0.1

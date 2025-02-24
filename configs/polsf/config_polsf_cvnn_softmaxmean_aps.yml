@@ -26,8 +26,8 @@ model:
     class: NoCtoR
     global: true
     softmax: SoftmaxMeanCtoR
-  downsampling: APS
-  upsampling: Upsample
+  downsampling: APD
+  upsampling: APU
   latent_dim: Null
   dropout : 0.1
   normalization: 
