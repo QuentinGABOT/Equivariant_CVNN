@@ -33,7 +33,9 @@ def build_model(
         "AvgPool",
         "MaxPool",
         "LPD",
+        "LPD_F",
         "APD",
+        "APD_F",
         "LPF",
         "StridedConv",
         None,
@@ -42,7 +44,9 @@ def build_model(
         "ConvTranspose",
         "Upsample",
         "APU",
+        "APU_F",
         "LPU",
+        "LPU_F",
         None,
     ], "Upsampling method not implemented"
     assert normalization in [

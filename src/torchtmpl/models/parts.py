@@ -199,12 +199,32 @@ class Down(nn.Module):
                 softmax=softmax,
                 dtype=dtype,
                 downsampling_factor=downsampling_factor,
+                no_antialias=True,
+            )
+        elif downsampling_method == "LPD_F":
+            self.downsampling_method = downsampling_lpd(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                activation=activation,
+                projection=projection,
+                softmax=softmax,
+                dtype=dtype,
+                downsampling_factor=downsampling_factor,
+                no_antialias=False,
             )
         elif downsampling_method == "APD":
             self.downsampling_method = downsampling_apd(
                 in_channels=in_channels,
                 out_channels=out_channels,
                 downsampling_factor=downsampling_factor,
+                no_antialias=True,
+            )
+        elif downsampling_method == "APD_F":
+            self.downsampling_method = downsampling_apd(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                downsampling_factor=downsampling_factor,
+                no_antialias=False,
             )
         elif downsampling_method == "LPF":
             self.downsampling_method = downsampling_lpf(
@@ -304,13 +324,26 @@ class Up(nn.Module):
             in_channels = out_channels
         elif upsampling_method == "APU":
             self.upsampling_method = upsampling_apu(
-                in_channels, upsampling_factor=upsampling_factor
+                in_channels, upsampling_factor=upsampling_factor, no_antialias=True
+            )
+        elif upsampling_method == "APU_F":
+            self.upsampling_method = upsampling_apu(
+                in_channels, upsampling_factor=upsampling_factor, no_antialias=False
             )
         elif upsampling_method == "LPU":
             self.upsampling_method = upsampling_lpu(
-                in_channels, softmax=softmax, upsampling_factor=upsampling_factor
+                in_channels,
+                softmax=softmax,
+                upsampling_factor=upsampling_factor,
+                no_antialias=True,
             )
-
+        elif upsampling_method == "LPU_F":
+            self.upsampling_method = upsampling_lpu(
+                in_channels,
+                softmax=softmax,
+                upsampling_factor=upsampling_factor,
+                no_antialias=False,
+            )
         input_size = input_size * upsampling_factor
 
         if skip_connections:
@@ -417,6 +450,7 @@ def downsampling_lpd(
     softmax,
     dtype,
     downsampling_factor,
+    no_antialias,
 ):
     if isinstance(softmax, SoftmaxMeanCtoR):
         gumbel_softmax = GumbelSoftmaxMeanCtoR()
@@ -426,13 +460,18 @@ def downsampling_lpd(
         gumbel_softmax = GumbelSoftmax()
     else:
         raise ValueError("Unexpected softmax layer")
+    antialias_layer = None
+    if no_antialias == False:
+        antialias_layer = partial(
+            LowPassFilter, filter_size=3, padding="same", padding_mode="circular"
+        )
     return set_pool(
         partial(
             PolyphaseInvariantDown2D,
             component_selection=LPS,
             get_logits=get_logits_model("LPSLogitLayers"),
             pass_extras=False,
-            no_antialias=True,
+            antialias_layer=antialias_layer,
         ),
         p_ch=in_channels,
         h_ch=out_channels,
@@ -442,21 +481,29 @@ def downsampling_lpd(
         softmax=softmax,
         dtype=dtype,
         stride=downsampling_factor,
+        no_antialias=no_antialias,
     )
 
 
-def downsampling_apd(in_channels, out_channels, downsampling_factor):
+def downsampling_apd(in_channels, out_channels, downsampling_factor, no_antialias):
+    antialias_layer = None
+    if no_antialias == False:
+        antialias_layer = partial(
+            LowPassFilter, filter_size=3, padding="same", padding_mode="circular"
+        )
+
     return set_pool(
         partial(
             PolyphaseInvariantDown2D,
             component_selection=max_p_norm,
             get_logits=get_logits_model("LPSLogitLayers"),
             pass_extras=False,
-            no_antialias=True,
+            antialias_layer=antialias_layer,
         ),
         p_ch=in_channels,
         h_ch=out_channels,
         stride=downsampling_factor,
+        no_antialias=no_antialias,
     )
 
 
@@ -475,33 +522,39 @@ def downsampling_lpf(in_channels, out_channels, downsampling_factor):
     )
 
 
-def upsampling_apu(in_channels, upsampling_factor):
+def upsampling_apu(in_channels, upsampling_factor, no_antialias):
+    antialias_layer = None
+    if no_antialias == False:
+        antialias_layer = partial(
+            LowPassFilter, filter_size=3, padding="same", padding_mode="circular"
+        )
     return set_unpool(
         partial(
             PolyphaseInvariantUp2D,
             component_selection=max_p_norm_u,
-            antialias_layer=partial(
-                LowPassFilter, filter_size=3, padding="same", padding_mode="circular"
-            ),
+            antialias_layer=antialias_layer,
         ),
         p_ch=in_channels,
-        no_antialias=False,
+        no_antialias=no_antialias,
         stride=upsampling_factor,
         softmax=None,
     )
 
 
-def upsampling_lpu(in_channels, softmax, upsampling_factor):
+def upsampling_lpu(in_channels, softmax, upsampling_factor, no_antialias):
+    antialias_layer = None
+    if no_antialias == False:
+        antialias_layer = partial(
+            LowPassFilter, filter_size=3, padding="same", padding_mode="circular"
+        )
     return set_unpool(
         partial(
             PolyphaseInvariantUp2D,
             component_selection=LPS_u,
-            antialias_layer=partial(
-                LowPassFilter, filter_size=3, padding="same", padding_mode="circular"
-            ),
+            antialias_layer=antialias_layer,
         ),
         p_ch=in_channels,
-        no_antialias=False,
+        no_antialias=no_antialias,
         softmax=softmax,
         stride=upsampling_factor,
     )
