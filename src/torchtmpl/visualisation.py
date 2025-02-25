@@ -827,7 +827,7 @@ def plot_classification_images(
         if dtype == torch.float64:
             # img = torch.view_as_complex(img).cpu().numpy()
             img = img[0,:,:] + 1j* img[1,:,:]
-            img = np.newaxis(img, axis=0)
+            img = img[np.newaxis]
 
         axes[row_idx][0].imshow(np.abs(exp_amplitude_transform(img[0])), cmap="gray")
         axes[row_idx][0].set_title(f"Amplitude HH Image {i+1} (Sample)")
