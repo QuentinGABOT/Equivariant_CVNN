@@ -2,7 +2,7 @@ data:
   batch_size: 128
   dataset:
     name: PolSFDataset
-    trainpath: ../datasets/SAN_FRANCISCO_ALOS2
+    trainpath: $TMPDIR/data
   transform: LogAmplitude
   img_size: 64
   img_stride: 64
@@ -26,8 +26,8 @@ model:
     class: ModCtoR
     global: true
     softmax: Softmax
-  downsampling: MaxPool
-  upsampling: Upsample
+  downsampling: APD_F
+  upsampling: APU_F
   latent_dim: Null
   dropout : 0.1
   normalization: 

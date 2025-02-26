@@ -2,7 +2,7 @@ data:
   batch_size: 80
   dataset:
     name: PolSFDataset
-    trainpath: ../../datasets/SAN_FRANCISCO_ALOS2
+    trainpath: $TMPDIR/data
   transform: LogAmplitude
   img_size: 64
   img_stride: 64
@@ -16,10 +16,10 @@ logging:
     project: polsf
 loss:
   name: FocalLoss
-  gamma: 3
+  gamma: 5
 model:
   activation: modReLU
-  channels_ratio: 32
+  channels_ratio: 12
   class: UNet
   res: true
   projection:
@@ -33,7 +33,7 @@ model:
   normalization: 
     method: BatchNorm
     track_running_stats: false
-  num_layers: 4
+  num_layers: 2
   gumbel_tau:
     start_value: 10
     gamma: 0.1

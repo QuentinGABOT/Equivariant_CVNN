@@ -2,7 +2,7 @@ data:
   batch_size: 128
   dataset:
     name: PolSFDataset
-    trainpath: ../datasets/SAN_FRANCISCO_ALOS2
+    trainpath: $TMPDIR/data
   transform: LogAmplitude
   img_size: 64
   img_stride: 64
@@ -23,17 +23,22 @@ model:
   class: UNet
   res: true
   projection:
-    class: NoCtoR
+    class: ModCtoR
     global: true
-    softmax: SoftmaxMeanCtoR
-  downsampling: MaxPool
-  upsampling: Upsample
+    softmax: Softmax
+  downsampling: LPD_F
+  upsampling: LPU_F
   latent_dim: Null
   dropout : 0.1
   normalization: 
     method: BatchNorm
     track_running_stats: false
   num_layers: 2
+  gumbel_tau:
+    start_value: 10
+    gamma: 0.1
+    start_decay_epoch: 10
+    min_value: 0.00001
 nepochs: 350
 optim:
   algo: AdamW
