@@ -74,7 +74,7 @@ fi
 
 
 def makejob_test_retrain_without_logdir(
-    commit_id, source_path, dataset_path, job_id, command
+    commit_id, source_path, dataset_path, train_job_id, job_id, command
 ):
     # Determine the rsync command based on the presence of "MSTAR" in source_path
     rsync_command = (
@@ -133,8 +133,7 @@ echo "Training"
 
 cd $current_dir
 
-logdir=`cat job_id/{job_id}`
-rm -f job_id/{job_id}
+logdir=`cat job_id/{train_job_id}`
 
 if [[ "{command}" == "retrain" ]]; then
     # The retrain will save its logdir into its job_id file
@@ -288,13 +287,15 @@ if command == "train":
         source_path=source_path,
         dataset_path=dataset_path,
     )
-    job_id = submit_job(job)
+    train_job_id = submit_job(job)
+    job_id = train_job_id
     for i in range(numruns - 1):
         job = makejob_test_retrain_without_logdir(
             commit_id,
             source_path=source_path,
             command="retrain",
             job_id=job_id,
+            train_job_id=train_job_id,
             dataset_path=dataset_path,
         )
         job_id = submit_job(job)
@@ -303,6 +304,7 @@ if command == "train":
         source_path=source_path,
         command="test",
         job_id=job_id,
+        train_job_id=train_job_id,
         dataset_path=dataset_path,
     )
     job_id = submit_job(job)
