@@ -2,7 +2,7 @@ data:
   batch_size: 100
   dataset:
     name: S1SLC
-    trainpath: ../datasets/S1SLC
+    trainpath: $TMPDIR/data
   transform: LogAmplitude
   num_workers: 4
   valid_ratio: 0.15
@@ -24,7 +24,7 @@ model:
     class: NoCtoR
     global: true
     softmax: SoftmaxMeanCtoR
-  downsampling: StridedConv
+  downsampling: LPD_F
   upsampling: Null
   latent_dim: 128
   dropout : 0.1
@@ -32,6 +32,12 @@ model:
     method: BatchNorm
     track_running_stats: false
   num_layers: 4
+  gumbel_tau:
+    start_value: 5
+    gamma: 0.1
+    start_decay_epoch: 5
+    min_value: 0.00001
+
 nepochs: 100
 optim:
   algo: AdamW

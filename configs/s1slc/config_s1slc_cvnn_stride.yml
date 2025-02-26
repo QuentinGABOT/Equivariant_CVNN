@@ -3,7 +3,7 @@ data:
   dataset:
     name: S1SLC
     trainpath: $TMPDIR/data
-  transform: LogAmplitude, RealImaginary
+  transform: LogAmplitude
   num_workers: 4
   valid_ratio: 0.15
   test_ratio: 0.15
@@ -16,15 +16,15 @@ loss:
   name: FocalLoss
   gamma: 3
 model:
-  activation: ReLU
+  activation: modReLU
   channels_ratio: 16
   class: ResNet
   res: true
   projection:
-    class: NoCtoR
+    class: ModCtoR
     global: true
     softmax: Softmax
-  downsampling: APD
+  downsampling: StridedConv
   upsampling: Null
   latent_dim: 128
   dropout : 0.1
@@ -45,4 +45,4 @@ scheduler:
     gamma: 1
 pretrained: false
 world_size: 4
-dtype: float64
+dtype: complex64

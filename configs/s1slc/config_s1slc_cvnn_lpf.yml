@@ -21,9 +21,9 @@ model:
   class: ResNet
   res: true
   projection:
-    class: NoCtoR
+    class: ModCtoR
     global: true
-    softmax: SoftmaxMeanCtoR
+    softmax: Softmax
   downsampling: LPF
   upsampling: Null
   latent_dim: 128
