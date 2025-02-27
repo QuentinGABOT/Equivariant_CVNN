@@ -31,7 +31,7 @@ model:
     softmax: SoftmaxMeanCtoR
     global: true
   downsampling: LPD
-  upsampling: LPD
+  upsampling: LPU
   latent_dim: Null
   dropout : 0
   normalization: 

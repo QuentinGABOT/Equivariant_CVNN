@@ -30,7 +30,7 @@ model:
     class: MLPCtoR
     global: true
   downsampling: LPD_F
-  upsampling: LPD_F
+  upsampling: LPU_F
   latent_dim: Null
   dropout : 0
   normalization: 
