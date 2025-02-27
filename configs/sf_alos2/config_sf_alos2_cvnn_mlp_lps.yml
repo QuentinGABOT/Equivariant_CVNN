@@ -27,10 +27,10 @@ model:
   class: AutoEncoderWD
   res: true
   projection:
-    class: ModCtoR
+    class: MLPCtoR
     global: true
-  downsampling: StridedConv
-  upsampling: Upsample
+  downsampling: LPD
+  upsampling: LPD
   latent_dim: Null
   dropout : 0
   normalization: 

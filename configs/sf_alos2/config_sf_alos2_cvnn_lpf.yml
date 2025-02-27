@@ -29,7 +29,7 @@ model:
   projection:
     class: ModCtoR
     global: true
-  downsampling: StridedConv
+  downsampling: LPF
   upsampling: Upsample
   latent_dim: Null
   dropout : 0

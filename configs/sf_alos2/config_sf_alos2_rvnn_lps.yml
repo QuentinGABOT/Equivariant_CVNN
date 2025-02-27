@@ -3,7 +3,7 @@ data:
   dataset:
     name: ALOSDataset
     trainpath: $TMPDIR/data
-  transform: LogAmplitude
+  transform: LogAmplitude, RealImaginary
   img_size: 64
   img_stride: 64
   num_workers: 4
@@ -29,8 +29,8 @@ model:
   projection:
     class: ModCtoR
     global: true
-  downsampling: StridedConv
-  upsampling: Upsample
+  downsampling: LPD
+  upsampling: LPU
   latent_dim: Null
   dropout : 0
   normalization: 
@@ -50,4 +50,4 @@ scheduler:
     gamma: 0.9
 pretrained: false
 world_size: 4
-dtype: complex64
+dtype: float64
