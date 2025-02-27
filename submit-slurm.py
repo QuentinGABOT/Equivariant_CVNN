@@ -24,7 +24,7 @@ def makejob_train(commit_id, config_path, source_path, dataset_path):
 #SBATCH --mem=200G
 #SBATCH --tmp=150G
 #SBATCH --partition=gpu
-#SBATCH --exclude=ruche-gpu06
+#SBATCH --exclude=ruche-gpu06,ruche-gpu07
 #SBATCH --time=24:00:00
 #SBATCH --output=logslurms/slurm-%j.out
 #SBATCH --error=logslurms/slurm-%j.err
@@ -92,7 +92,7 @@ def makejob_test_retrain_without_logdir(
 #SBATCH --mem=200G
 #SBATCH --tmp=150G
 #SBATCH --partition=gpu
-#SBATCH --exclude=ruche-gpu06
+#SBATCH --exclude=ruche-gpu06,ruche-gpu07
 #SBATCH --time=24:00:00
 #SBATCH --output=logslurms/slurm-%j.out
 #SBATCH --error=logslurms/slurm-%j.err
@@ -170,7 +170,7 @@ def makejob_test_retrain_with_logdir(
 #SBATCH --mem=200G
 #SBATCH --tmp=150G
 #SBATCH --partition=gpu
-#SBATCH --exclude=ruche-gpu06
+#SBATCH --exclude=ruche-gpu06,ruche-gpu07
 #SBATCH --time=24:00:00
 #SBATCH --output=logslurms/slurm-%j.out
 #SBATCH --error=logslurms/slurm-%j.err
