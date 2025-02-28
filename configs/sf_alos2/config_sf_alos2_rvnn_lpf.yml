@@ -22,7 +22,7 @@ logging:
 loss:
   name: ComplexMSELoss
 model:
-  activation: modReLU
+  activation: ReLU
   channels_ratio: 16
   class: AutoEncoderWD
   res: true
