@@ -823,10 +823,10 @@ def plot_classification_images(
         row_idx = i + 1
 
         img = to_be_vizualized[i][0]
-        
+
         if dtype == torch.float64:
             # img = torch.view_as_complex(img).cpu().numpy()
-            img = img[0,:,:] + 1j* img[1,:,:]
+            img = img[0, :, :] + 1j * img[1, :, :]
             img = img[np.newaxis]
 
         axes[row_idx][0].imshow(np.abs(exp_amplitude_transform(img[0])), cmap="gray")
@@ -1042,7 +1042,7 @@ def plot_reconstruction_polsar_images(
         idx += 1
 
         confusion_matrix = skm.confusion_matrix(
-            h_alpha_gt.ravel(), h_alpha_pred.ravel()
+            h_alpha_gt.ravel(), h_alpha_pred.ravel(), normalize="true"
         )
         # Confusion matrix
         sns.heatmap(

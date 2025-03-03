@@ -32,16 +32,16 @@ model:
   downsampling: StridedConv
   upsampling: Upsample
   latent_dim: Null
-  dropout : 0
-  normalization: 
+  dropout: 0
+  normalization:
     method: BatchNorm
     track_running_stats: false
   num_layers: 4
-nepochs: 300
+nepochs: 350
 optim:
   algo: AdamW
   params:
-    lr: 0.01
+    lr: 0.001
     weight_decay: 0
 scheduler:
   algo: StepLR

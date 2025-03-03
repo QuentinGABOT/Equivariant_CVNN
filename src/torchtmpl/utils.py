@@ -934,6 +934,7 @@ def one_forward(model, loader, task, softmax, device, dtype, is_wrapped, return_
             if is_wrapped:
                 if len(data) == 2:
                     inputs, idx = data
+                    list_of_indices.extend(idx.cpu().numpy().tolist())
                 elif len(data) == 3:
                     inputs, labels, idx = data
                     list_of_indices.extend(idx.cpu().numpy().tolist())
@@ -997,6 +998,7 @@ def one_forward(model, loader, task, softmax, device, dtype, is_wrapped, return_
                 pred_outputs = softmax(pred_outputs).argmax(dim=1).cpu().numpy()
             else:
                 pred_outputs = pred_outputs.cpu().numpy()
+
             outputs.extend(pred_outputs)
     if hook_handle is not None:
         hook_handle.remove()
