@@ -976,6 +976,7 @@ def test(params: list) -> None:
                 to_be_vizualized=to_be_vizualized,
                 logdir=logdir,
                 wandb_log=wandb_log,
+                dtype=dtype,
             )
 
     elif task == "classification":

@@ -921,6 +921,7 @@ def plot_reconstruction_polsar_images(
     to_be_vizualized: list,
     logdir: str,
     wandb_log: bool,
+    dtype: torch.dtype,
 ) -> None:
     num_samples = to_be_vizualized[0].shape[0]  # Number of samples
     ncols = 12  # Number of plots per sample
@@ -954,6 +955,10 @@ def plot_reconstruction_polsar_images(
     for i in range(num_samples):
         img = to_be_vizualized[0][i]
         pred = to_be_vizualized[1][i]
+        # Transform the input numpy array into a complex array
+        if dtype == torch.float64:
+            img = img[:3] + 1j * img[3:]
+            pred = pred[:3] + 1j * pred[3:]
 
         idx = 0
 
