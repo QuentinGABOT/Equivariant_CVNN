@@ -20,13 +20,21 @@ def generate_key_from_config(config):
 
     key += "_"
 
-    key += downsampling
-
-    key += "_"
-
-    key += upsampling
-
-    key += "_"
+    if downsampling == "LPD" and upsampling == "LPU":
+        key += "LPS"
+        key += "_"
+    elif downsampling == "APD" and upsampling == "APU":
+        key += "APS"
+        key += "_"
+    elif downsampling == "LPD_F" and upsampling == "LPU_F":
+        key += "LPS_F"
+        key += "_"
+    elif downsampling == "APD_F" and upsampling == "APU_F":
+        key += "APS_F"
+        key += "_"
+    elif downsampling == "LPF":
+        key += "LPF"
+        key += "_"
 
     if dtype == "complex64":
         key += dtype
@@ -48,8 +56,6 @@ def generate_key_from_config(config):
                 key += class_projection
     elif dtype == "float64":
         key += dtype
-        key += "_"
-        key += config["data"]["transform"].split(",")[1]
     else:
         raise ValueError(f"Unknown dtype {dtype}")
 
@@ -133,6 +139,142 @@ def log_collected_runs_to_tex(collected_runs, dataset):
                 f"${round(cir_s_mean, 2)} \\pm {round(cir_s_std,2)}$ & ${round(std_s_mean, 2)} \\pm {round(std_s_std,2)}$ \\\\\n"
             )
             f.write("\\hline\n")
+        f.write("\\end{tabular}\n")
+        f.write(f"\\caption{{Results for {dataset}}}\n")
+        f.write("\\end{table}\n")
+
+
+def log_collected_runs_to_tex_short(collected_runs, dataset):
+    table_filename = f"{dataset}_table.tex"
+    # Prepare lists for prioritized entries (with LPS and APS separated) and the others
+    lps_entries = []
+    aps_entries = []
+    other_entries = []
+
+    # Process each run entry from collected_runs
+    for key, runs in collected_runs.items():
+        # If more than 5 runs, filter out the worst ones based on Best Loss (lower is better)
+        if len(runs["Best Loss"]) > 5:
+            indices = sorted(
+                range(len(runs["Best Loss"])), key=lambda i: runs["Best Loss"][i]
+            )[:5]
+            for metric in runs:
+                runs[metric] = [runs[metric][i] for i in indices]
+
+        # Determine dtype and adjust key accordingly
+        if "complex64" in key:
+            dtype = "$\\mathbb{C}$"
+            key = key.replace("_complex64_", "_")
+        elif "float64" in key:
+            dtype = "$\\mathbb{R}$"
+            key = key.replace("_float64", "_")
+        else:
+            raise ValueError(f"Unknown dtype in {key}")
+
+        # Generate a display model string
+        model = key.replace("_", " ")
+        model = model.replace("  ", " ")
+
+        # Calculate metrics
+        oa = runs["test_overall_accuracy"]
+        oa_mean = sum(oa) / len(oa)
+        oa_std = np.std(oa)
+        f1 = runs["test_macro_f1"]
+        f1_mean = sum(f1) / len(f1)
+        f1_std = np.std(f1)
+        cir_s = runs["test_circ_consistency"]
+        cir_s_mean = sum(cir_s) / len(cir_s)
+        cir_s_std = np.std(cir_s)
+        std_s = runs["test_std_consistency"]
+        std_s_mean = sum(std_s) / len(std_s)
+        std_s_std = np.std(std_s)
+
+        # Create a tuple for the table row.
+        entry = (
+            model,
+            dtype,
+            oa_mean,
+            oa_std,
+            f1_mean,
+            f1_std,
+            cir_s_mean,
+            cir_s_std,
+            std_s_mean,
+            std_s_std,
+        )
+
+        # Separate runs based on model name: prioritize LPS over APS
+        if "LPS" in model:
+            lps_entries.append(entry)
+        elif "APS" in model:
+            aps_entries.append(entry)
+        else:
+            other_entries.append(entry)
+
+    # Sort each category by F1 mean (descending order)
+    lps_entries.sort(key=lambda entry: entry[4], reverse=True)
+    aps_entries.sort(key=lambda entry: entry[4], reverse=True)
+    other_entries.sort(key=lambda entry: entry[4], reverse=True)
+
+    # Open file and write the table header
+    with open(table_filename, "w") as f:
+        f.write("\\begin{table}[h]\n")
+        f.write("\\centering\n")
+        f.write("\\begin{tabular}{|c|c|c|c|c|c|c|}\n")
+        f.write("\\hline\n")
+        f.write(
+            "Model & Type & OA (\\%) & F1 (\\%) & Cir. S. (\\%) & Std. S. (\\%) \\\\\n"
+        )
+        f.write("\\hline\n")
+
+        # Write LPS entries first, then APS entries
+        for (
+            model,
+            dtype,
+            oa_mean,
+            oa_std,
+            f1_mean,
+            f1_std,
+            cir_s_mean,
+            cir_s_std,
+            std_s_mean,
+            std_s_std,
+        ) in (lps_entries + aps_entries):
+            f.write(
+                f"{model} & {dtype} & "
+                f"${round(oa_mean, 2)} \\pm {round(oa_std,2)}$ & "
+                f"${round(f1_mean, 2)} \\pm {round(f1_std,2)}$ & "
+                f"${round(cir_s_mean, 2)} \\pm {round(cir_s_std,2)}$ & "
+                f"${round(std_s_mean, 2)} \\pm {round(std_s_std,2)}$ \\\\\n"
+            )
+            f.write("\\hline\n")
+
+        # If there are prioritized as well as other entries, add a double line separator
+        if (lps_entries or aps_entries) and other_entries:
+            f.write("\\hline\\hline\n")
+
+        # Write non-prioritized entries
+        for (
+            model,
+            dtype,
+            oa_mean,
+            oa_std,
+            f1_mean,
+            f1_std,
+            cir_s_mean,
+            cir_s_std,
+            std_s_mean,
+            std_s_std,
+        ) in other_entries:
+            f.write(
+                f"{model} & {dtype} & "
+                f"${round(oa_mean, 2)} \\pm {round(oa_std,2)}$ & "
+                f"${round(f1_mean, 2)} \\pm {round(f1_std,2)}$ & "
+                f"${round(cir_s_mean, 2)} \\pm {round(cir_s_std,2)}$ & "
+                f"${round(std_s_mean, 2)} \\pm {round(std_s_std,2)}$ \\\\\n"
+            )
+            f.write("\\hline\n")
+
         f.write("\\end{tabular}\n")
         f.write(f"\\caption{{Results for {dataset}}}\n")
         f.write("\\end{table}\n")
@@ -230,4 +372,4 @@ def get_collected_runs(dataset):
 if __name__ == "__main__":
     dataset = "polsf"
     collected_runs = get_collected_runs(dataset)
-    log_collected_runs_to_tex(collected_runs, dataset)
+    log_collected_runs_to_tex_short(collected_runs, dataset)
