@@ -422,10 +422,16 @@ class Dense(nn.Module):
             out_features = num_classes
 
         self.fc_1 = nn.Linear(
-            in_features=in_channels, out_features=latent_dim, dtype=dtype
+            in_features=in_channels,
+            out_features=latent_dim,
+            dtype=dtype,
+            bias=False,
         )
         self.fc_2 = nn.Linear(
-            in_features=latent_dim, out_features=out_features, dtype=dtype
+            in_features=latent_dim,
+            out_features=out_features,
+            dtype=dtype,
+            biais=False,
         )
 
     def forward(self, x):
