@@ -87,7 +87,7 @@ def load_model(
     )
     shift_eq, shift_inv, task = get_model_properties(config=config)
     model.load_state_dict(checkpoint["model_state_dict"])
-    if shift_eq or shift_inv:
+    if config["model"]["downsampling"] in ["LPD", "LPD_F"]:
         tau = checkpoint["tau"]
         initialize_gumbel_tau(model, tau)
     return model, projection, shift_eq, shift_inv, task
@@ -116,7 +116,7 @@ def init_model(
     )
     shift_eq, shift_inv, task = get_model_properties(config=config)
     model.apply(init_weights)
-    if shift_eq or shift_inv:
+    if config["model"]["downsampling"] in ["LPD", "LPD_F"]:
         tau = torch.tensor(config["model"]["gumbel_tau"]["start_value"])
         initialize_gumbel_tau(model, tau)
     return model, shift_eq, shift_inv, task
@@ -344,6 +344,19 @@ def load(config: dict) -> tuple:
             softmax=softmax,
         )
 
+    with torch.no_grad():
+        dummy_input = torch.rand(
+            (
+                config["data"]["batch_size"],
+                num_channels,
+                img_size,
+                img_size,
+            ),
+            dtype=dtype,
+            requires_grad=False,
+        )
+        validate_shift_invariance(model, dummy_input, shift_eq, shift_inv)
+
     model.to(device)
 
     # Build the loss function
@@ -567,8 +580,7 @@ def train(params: Union[list, dict], log_file=None) -> None:
         )
 
         if (
-            shift_eq
-            or shift_inv
+            config["model"]["downsampling"] in ["LPD", "LPD_F"]
             and e >= config["model"]["gumbel_tau"]["start_decay_epoch"]
         ):
             update_gumbel_tau(
@@ -613,7 +625,7 @@ def train(params: Union[list, dict], log_file=None) -> None:
             epoch=e,
             metrics=metrics,
             projection=projection,
-            shift=(shift_eq or shift_inv),
+            learnable_shift=config["model"]["downsampling"] in ["LPD", "LPD_F"],
             updated=updated,
         )
 
@@ -631,7 +643,7 @@ def save_checkpoint(
     epoch: int,
     metrics: dict,
     projection,
-    shift: bool = False,
+    learnable_shift: bool = False,
     updated: bool = False,
 ) -> None:
     """
@@ -646,7 +658,7 @@ def save_checkpoint(
         "valid_loss": metrics["valid_loss"],
     }
 
-    if shift:
+    if learnable_shift:
         checkpoint["tau"] = model.encoder[
             1
         ].downsampling_method.component_selection.gumbel_tau
@@ -1005,19 +1017,25 @@ def validate_shift_invariance(
     """
     Validate the shift invariance of the model.
     """
+    model = model.cuda().eval()
+    dummy_input = dummy_input.cuda()
     if shift_eq:
         y_orig, _ = model(dummy_input)
+        y_orig = y_orig.detach().cpu()
         img_roll = torch.roll(dummy_input, shifts=(1, 1), dims=(-1, -2))
         y_roll, _ = model(img_roll)
+        y_roll = y_roll.detach().cpu()
         y_roll_s = torch.roll(y_roll, shifts=(-1, -1), dims=(-1, -2))
         print(f"Norm(y_orig-y_roll_s): {torch.norm(y_orig - y_roll_s):e}")
-        # assert torch.allclose(y_orig, y_roll_s)
+        assert torch.allclose(y_orig, y_roll_s)
     elif shift_inv:
         y_orig, _ = model(dummy_input)
+        y_orig = y_orig.detach().cpu()
         img_roll = torch.roll(dummy_input, shifts=(1, 1), dims=(-1, -2))
         y_roll, _ = model(img_roll)
+        y_roll = y_roll.detach().cpu()
         print(f"Norm(y_orig-y_roll): {torch.norm(y_orig - y_roll):e}")
-        # assert torch.allclose(y_orig, y_roll)
+        assert torch.allclose(y_orig, y_roll)
     else:
         _ = model(dummy_input)
 
@@ -1036,16 +1054,12 @@ def get_model_properties(config) -> tuple:
     model_class = config["model"]["class"]
     downsampling_method = config["model"]["downsampling"]
     upsampling_method = config["model"]["upsampling"]
-    shift_equivariant = (
-        model_class == "UNet"
-        or model_class == "AutoEncoder"
-        or model_class == "AutoEncoderWD"
-    ) and (
-        downsampling_method == "PolyphaseInvariantDown2D"
-        and upsampling_method == "PolyphaseInvariantUp2D"
+    shift_equivariant = (model_class in ["UNet", "AutoEncoder", "AutoEncoderWD"]) and (
+        downsampling_method in ["LPD", "LPD_F", "APD", "APD_F"]
+        and upsampling_method in ["APU", "APU_F", "LPU", "LPU_F"]
     )
     shift_invariant = (model_class == "ResNet") and (
-        downsampling_method == "PolyphaseInvariantDown2D" and upsampling_method == None
+        downsampling_method in ["LPD", "LPD_F", "APD", "APD_F"]
     )
 
     if model_class == "UNet":

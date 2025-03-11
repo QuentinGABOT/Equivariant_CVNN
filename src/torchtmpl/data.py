@@ -67,6 +67,11 @@ def get_transform_instance(transform_name, name_dataset, size):
 
     transform_instances.append(ToTensor())
 
+    if name_dataset == "S1SLC":
+        transform_instances.append(
+            torchvision.transforms.CenterCrop(96)
+        )  # needed to ensure that the image is divisible 4 times by 2 (for the shift-invariant/equivariant property of the network)
+
     for name in transform_names:
         try:
             TransformClass = getattr(cvnn.transforms, name)

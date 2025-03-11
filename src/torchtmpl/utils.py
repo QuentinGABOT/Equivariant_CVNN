@@ -419,7 +419,6 @@ def circular_shift_consistency(model, inputs, task, device):
     with torch.no_grad():
         _, pred_outputs_s = model(inputs_s)
 
-    pred_outputs_s = pred_outputs_s
     if task == "segmentation" or task == "reconstruction":
         pred_outputs_s = torch.roll(
             pred_outputs_s, shifts=(-off0, -off1), dims=(-1, -2)
@@ -437,7 +436,6 @@ def shift_consistency(model, inputs, c_pred_outputs_1, task, softmax, device):
     )
 
     if task == "classification" or task == "segmentation":
-
         c_pred_outputs_1 = c_pred_outputs_1.argmax(
             dim=1
         ).cpu()  # we use the softmax in case prob is of type complex.64
@@ -454,7 +452,7 @@ def shift_consistency(model, inputs, c_pred_outputs_1, task, softmax, device):
         circular = torch.mean(c_pred_outputs_1.eq(c_pred_outputs_2).float())
         standard = torch.mean(s_pred_outputs_1.eq(s_pred_outputs_2).float())
     else:
-        circular = torch.norm(c_pred_outputs_1.cpu() - c_pred_outputs_2.cpu())
+        circular = torch.norm(c_pred_outputs_1 - c_pred_outputs_2)
 
     return circular, standard
 
