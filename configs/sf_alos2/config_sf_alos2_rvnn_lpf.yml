@@ -37,7 +37,7 @@ model:
     method: BatchNorm
     track_running_stats: false
   num_layers: 4
-nepochs: 350
+nepochs: 1250
 optim:
   algo: AdamW
   params:

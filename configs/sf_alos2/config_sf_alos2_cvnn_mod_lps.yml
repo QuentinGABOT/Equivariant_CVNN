@@ -29,15 +29,20 @@ model:
   projection:
     class: ModCtoR
     global: true
-  downsampling: LPD
-  upsampling: LPU
+  downsampling: LPD_F
+  upsampling: LPU_F
   latent_dim: Null
   dropout: 0
   normalization:
     method: BatchNorm
     track_running_stats: false
   num_layers: 4
-nepochs: 350
+  gumbel_tau:
+    start_value: 10
+    gamma: 0.1
+    start_decay_epoch: 10
+    min_value: 0.00001
+nepochs: 1250
 optim:
   algo: AdamW
   params:
