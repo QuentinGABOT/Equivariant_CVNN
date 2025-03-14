@@ -1,5 +1,5 @@
 data:
-  batch_size: 100
+  batch_size: 1024
   dataset:
     name: S1SLC
     trainpath: $TMPDIR/data
@@ -24,7 +24,7 @@ model:
     class: NoCtoR
     global: true
     softmax: Softmax
-  downsampling: LPD
+  downsampling: LPD_F
   upsampling: Null
   latent_dim: 128
   dropout : 0.1

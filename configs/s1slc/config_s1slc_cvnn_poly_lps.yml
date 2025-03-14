@@ -24,7 +24,7 @@ model:
     class: PolyCtoR
     global: true
     softmax: Softmax
-  downsampling: LPD
+  downsampling: LPD_F
   upsampling: Null
   latent_dim: 128
   dropout : 0.1
@@ -41,7 +41,7 @@ nepochs: 100
 optim:
   algo: AdamW
   params:
-    lr: 0.01
+    lr: 0.001
     weight_decay: 0.0005
 scheduler:
   algo: StepLR
