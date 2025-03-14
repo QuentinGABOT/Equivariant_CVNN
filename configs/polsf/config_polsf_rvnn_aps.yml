@@ -16,30 +16,30 @@ logging:
     project: polsf
 loss:
   name: FocalLoss
-  gamma: 5
+  gamma: 3
 model:
   activation: ReLU
-  channels_ratio: 12
+  channels_ratio: 16
   class: UNet
   res: true
   projection:
     class: NoCtoR
     global: true
     softmax: Softmax
-  downsampling: APD
-  upsampling: APU
+  downsampling: APD_F
+  upsampling: APU_F
   latent_dim: Null
   dropout : 0.1
   normalization: 
     method: BatchNorm
     track_running_stats: false
-  num_layers: 2
-nepochs: 350
+  num_layers: 4
+nepochs: 500
 optim:
   algo: AdamW
   params:
     lr: 0.001
-    weight_decay: 0.0005
+    weight_decay: 0.005
 scheduler:
   algo: StepLR
   params:

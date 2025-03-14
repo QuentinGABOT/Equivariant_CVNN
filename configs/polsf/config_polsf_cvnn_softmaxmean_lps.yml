@@ -16,18 +16,18 @@ logging:
     project: polsf
 loss:
   name: FocalLoss
-  gamma: 5
+  gamma: 3
 model:
   activation: modReLU
-  channels_ratio: 12
+  channels_ratio: 16
   class: UNet
   res: true
   projection:
     class: NoCtoR
     global: true
     softmax: SoftmaxMeanCtoR
-  downsampling: LPD
-  upsampling: LPU
+  downsampling: LPD_F
+  upsampling: LPU_F
   latent_dim: Null
   dropout : 0.1
   normalization: 
