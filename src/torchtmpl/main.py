@@ -438,7 +438,7 @@ def configure_logging_directory(log_path: str, config: dict) -> pathlib.Path:
 
 
 def update_gumbel_tau(model: nn.Module, gamma: float, min_val: torch.Tensor) -> None:
-    for enc in model.encoder[1:]:
+    for enc in model.encoder_block[1:]:
         tau = enc.downsampling_method.component_selection.gumbel_tau
         enc.downsampling_method.component_selection.gumbel_tau = max(
             tau * gamma, min_val
@@ -450,7 +450,7 @@ def initialize_gumbel_tau(model: nn.Module, tau: torch.tensor) -> None:
     Initialize the gumbel tau value for the model if needed.
     """
 
-    for enc in model.encoder[1:]:
+    for enc in model.encoder_block[1:]:
         enc.downsampling_method.component_selection.gumbel_tau = tau
 
 
@@ -659,7 +659,7 @@ def save_checkpoint(
     }
 
     if learnable_shift:
-        checkpoint["tau"] = model.encoder[
+        checkpoint["tau"] = model.encoder_block[
             1
         ].downsampling_method.component_selection.gumbel_tau
 
