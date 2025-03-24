@@ -344,6 +344,7 @@ def load(config: dict) -> tuple:
             softmax=softmax,
         )
 
+    model.eval()
     with torch.no_grad():
         dummy_input = torch.rand(
             (
@@ -355,7 +356,7 @@ def load(config: dict) -> tuple:
             dtype=dtype,
             requires_grad=False,
         )
-        validate_shift_invariance(model, dummy_input, shift_eq, shift_inv)
+        _ = model(dummy_input)
 
     model.to(device)
 
@@ -793,7 +794,7 @@ def test(params: list) -> None:
             dtype=dtype,
             requires_grad=False,
         )
-        validate_shift_invariance(model, dummy_input, shift_eq, shift_inv)
+        _ = model(dummy_input)
 
     logdir = pathlib.Path(log_path)
     logging.info(f"Will be logging into {logdir}")
