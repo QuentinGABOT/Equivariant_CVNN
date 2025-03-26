@@ -452,7 +452,7 @@ def shift_consistency(model, inputs, c_pred_outputs_1, task, softmax, device):
         circular = torch.mean(c_pred_outputs_1.eq(c_pred_outputs_2).float())
         standard = torch.mean(s_pred_outputs_1.eq(s_pred_outputs_2).float())
     else:
-        circular = torch.norm(c_pred_outputs_1 - c_pred_outputs_2)
+        circular = torch.norm(c_pred_outputs_1.cpu() - c_pred_outputs_2.cpu())
 
     return circular, standard
 
