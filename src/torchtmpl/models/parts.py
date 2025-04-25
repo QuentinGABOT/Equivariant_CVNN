@@ -62,6 +62,7 @@ class DoubleConv(nn.Module):
             kernel_size=3,
             stride=stride,
             padding=padding,
+            bias=False,
             padding_mode="circular",
             dtype=self.dtype,
         )
@@ -93,6 +94,7 @@ class DoubleConv(nn.Module):
             kernel_size=3,
             stride=1,
             padding=padding,
+            bias=False,
             padding_mode="circular",
             dtype=self.dtype,
         )
@@ -134,6 +136,7 @@ class DoubleConv(nn.Module):
                     out_channels,
                     kernel_size=1,
                     stride=stride,
+                    bias=False,
                     padding=0,
                     padding_mode="circular",
                     dtype=self.dtype,
@@ -422,11 +425,13 @@ class Dense(nn.Module):
             in_features=in_channels,
             out_features=latent_dim,
             dtype=dtype,
+            bias=False,
         )
         self.fc_2 = nn.Linear(
             in_features=latent_dim,
             out_features=out_features,
             dtype=dtype,
+            biais=False,
         )
 
     def forward(self, x):
