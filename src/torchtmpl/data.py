@@ -18,6 +18,33 @@ import torchvision
 # Constants for ignore index
 IGNORE_INDEX = -100
 
+import random
+import torch
+ 
+class RandomCircularShiftTensor:
+    """Randomly circular-shift a torch Tensor image.
+ 
+    Args:
+        max_dx: maximum shift in the horizontal direction (pixels)
+        max_dy: maximum shift in the vertical direction (pixels)
+    """
+    def __init__(self, max_dx: int, max_dy: int):
+        self.max_dx = max_dx
+        self.max_dy = max_dy
+ 
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            img: Tensor image of shape (C, H, W)
+        Returns:
+            Shifted image of same shape, with wrap-around.
+        """
+        # choose random shifts
+        dx = random.randint(-self.max_dx, self.max_dx)
+        dy = random.randint(-self.max_dy, self.max_dy)
+        # roll dims 1 and 2 (H and W)
+        return torch.roll(img, shifts=(dy, dx), dims=(1, 2))
+
 
 class GenericDatasetWrapper(Dataset):
     def __init__(self, dataset):
@@ -73,11 +100,14 @@ def get_transform_instance(transform_name, name_dataset, size):
         )  # needed to ensure that the image is divisible 4 times by 2 (for the shift-invariant/equivariant property of the network)
 
     for name in transform_names:
-        try:
-            TransformClass = getattr(cvnn.transforms, name)
-        except AttributeError:
-            TransformClass = getattr(torchvision.transforms, name)
-        transform_instances.append(TransformClass())
+        if name == "RandomCircularShiftTensor":
+            transform_instances.append(RandomCircularShiftTensor(9,9))
+        else:
+            try:
+                TransformClass = getattr(cvnn.transforms, name)
+            except AttributeError:
+                TransformClass = getattr(torchvision.transforms, name)
+            transform_instances.append(TransformClass())
 
     # If there's more than one transform, compose them
     if len(transform_instances) > 1:
