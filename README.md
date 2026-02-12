@@ -25,7 +25,7 @@ Key contributions:
 
 The core mechanism relies on **Polyphase Decomposition**. The network learns to select the optimal polyphase component $Poly_k(z)$ based on a shift-invariant score. Since the selection mechanism (Gumbel Softmax) requires real-valued logits, we introduce specific projection layers to map the complex features to real scores without losing phase information.
 
-![Architecture](figures/complex_lpd.png)
+![Architecture](figures/complex_lpd.pdf)
 *Figure 1: Proposed Complex-Valued LPS Architecture. The selection probability $p_\theta$ is learned via a projection network $f_\theta$ and Gumbel Softmax.*
 
 ## 💾 Datasets
