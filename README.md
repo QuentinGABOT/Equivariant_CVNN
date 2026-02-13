@@ -197,5 +197,3 @@ If you use this code in your research, please cite our WACV 2026 paper:
 ## 🙏 Acknowledgments
 
 This work was supported by **SONDRA**, **CentraleSupélec**, **ONERA**, and **DSO National Laboratories**.
-
-```
