@@ -2,7 +2,7 @@ data:
   batch_size: 1024
   dataset:
     name: S1SLC
-    trainpath: $TMPDIR/data
+    trainpath: ../../datasets/S1SLC/
   transform: LogAmplitude, RealImaginary
   num_workers: 4
   valid_ratio: 0.15

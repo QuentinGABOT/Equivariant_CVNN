@@ -1,8 +1,8 @@
 data:
-  batch_size: 128
+  batch_size: 16
   dataset:
     name: PolSFDataset
-    trainpath: $TMPDIR/data
+    trainpath: ../../datasets/SAN_FRANCISCO_ALOS2
   transform: LogAmplitude, RealImaginary
   img_size: 64
   img_stride: 64
@@ -19,7 +19,7 @@ loss:
   gamma: 3
 model:
   activation: ReLU
-  channels_ratio: 16
+  channels_ratio: 32
   class: UNet
   res: true
   projection:

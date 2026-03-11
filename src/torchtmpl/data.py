@@ -139,6 +139,7 @@ def get_dataloaders(data_config: dict, use_cuda: bool) -> tuple:
             input_transform,
             valid_ratio,
             test_ratio,
+            crop=True, # Need to change back to False for the full image
         )
     elif name_dataset == "Bretigny":
         train_dataset, valid_dataset, test_dataset = prepare_bretigny_dataset(

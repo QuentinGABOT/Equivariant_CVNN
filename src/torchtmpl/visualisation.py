@@ -21,6 +21,15 @@ import umap
 import plotly.colors
 import plotly.express as px
 
+from .utils import (
+    log_images_and_metrics,
+    compute_classification_metrics,
+    compute_kappa,
+    compute_overall_accuracy,
+    normalize_confusion_matrix,
+    compute_iou,
+)
+
 MIN_VALUE = 0.02
 MAX_VALUE = 40
 
@@ -922,6 +931,7 @@ def plot_reconstruction_polsar_images(
     logdir: str,
     wandb_log: bool,
     dtype: torch.dtype,
+    metrics: dict,
 ) -> None:
     num_samples = to_be_vizualized[0].shape[0]  # Number of samples
     ncols = 12  # Number of plots per sample
@@ -1067,6 +1077,26 @@ def plot_reconstruction_polsar_images(
     path = f"{logdir}/reconstruction_images.png"
     plt.savefig(path, bbox_inches="tight", pad_inches=0.1)
     plt.close()
+
+    overall_accuracy = compute_overall_accuracy(confusion_matrix)
+    kappa_score = compute_kappa(confusion_matrix)
+    metrics_classif = compute_classification_metrics(confusion_matrix)
+    conf_matrix_accum = normalize_confusion_matrix(confusion_matrix)
+
+    metrics["test_overall_accuracy"] = 100 * overall_accuracy
+    metrics["test_kappa_score"] = 100 * kappa_score
+    metrics["test_macro_precision"] = 100 * metrics_classif["macro_precision"]
+    metrics["test_macro_recall"] = 100 * metrics_classif["macro_recall"]
+    metrics["test_macro_f1"] = 100 * metrics_classif["macro_f1"]
+    metrics["test_precision_per_class"] = 100 * metrics_classif["precision_per_class"]
+    metrics["test_recall_per_class"] = 100 * metrics_classif["recall_per_class"]
+    metrics["test_f1_per_class"] = 100 * metrics_classif["f1_per_class"]
+
+    iou_classes, mean_iou = compute_iou(conf_matrix_accum)
+    metrics["test_iou_per_class"] = 100 * iou_classes
+    metrics["test_mean_iou"] = 100 * mean_iou
+
+    log_images_and_metrics(wandb_log, metrics)
 
     if wandb_log:
         wandb.log(

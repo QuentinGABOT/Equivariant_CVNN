@@ -72,9 +72,9 @@ def binomial_expansion(a, b, N):
 class MLPCtoR(nn.Module):
     def __init__(self):
         super(MLPCtoR, self).__init__()
-        self.linear1 = nn.Linear(2, 16, dtype=torch.float64, bias=True)
-        self.linear2 = nn.Linear(16, 32, dtype=torch.float64, bias=True)
-        self.linear3 = nn.Linear(32, 1, dtype=torch.float64, bias=True)
+        self.linear1 = nn.Linear(2, 8, dtype=torch.float64, bias=True)
+        self.linear2 = nn.Linear(8, 16, dtype=torch.float64, bias=True)
+        self.linear3 = nn.Linear(16, 1, dtype=torch.float64, bias=True)
         self.relu = nn.ReLU()
 
         self.mlp = nn.Sequential(

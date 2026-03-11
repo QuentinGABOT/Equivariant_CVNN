@@ -1,5 +1,5 @@
 data:
-  batch_size: 32
+  batch_size: 64
   dataset:
     name: ALOSDataset
     trainpath: ../../datasets/SAN_FRANCISCO_ALOS2
@@ -23,32 +23,26 @@ loss:
   name: ComplexMSELoss
 model:
   activation: modReLU
-  channels_ratio: 8
+  channels_ratio: 16
   class: AutoEncoderWD
-  res: true
+  res: false
   projection:
-    class: NoCtoR
-    softmax: SoftmaxMeanCtoR
+    class: ModCtoR
     global: true
-  downsampling: LPD
-  upsampling: LPU
+  downsampling: StridedConv
+  upsampling: ConvTranspose
   latent_dim: Null
   dropout: 0
   normalization:
     method: BatchNorm
     track_running_stats: false
   num_layers: 4
-  gumbel_tau:
-    start_value: 10
-    gamma: 0.1
-    start_decay_epoch: 10
-    min_value: 0.00001
 nepochs: 500
 optim:
   algo: AdamW
   params:
-    lr: 0.005
-    weight_decay: 0.0005
+    lr: 0.0005
+    weight_decay: 0.0001
 scheduler:
   algo: StepLR
   params:

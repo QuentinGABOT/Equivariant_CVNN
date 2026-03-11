@@ -431,7 +431,7 @@ class Dense(nn.Module):
             in_features=latent_dim,
             out_features=out_features,
             dtype=dtype,
-            biais=False,
+            bias=False,
         )
 
     def forward(self, x):

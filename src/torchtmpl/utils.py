@@ -26,11 +26,13 @@ import os
 from typing import Tuple
 import inspect
 import warnings
+import logging
 
 # External imports
 import torch
 import torch.nn as nn
 import tqdm
+import wandb
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
@@ -470,7 +472,7 @@ def train_epoch(
     number_classes,
     epoch: int,
     ignore_index=-100,
-    max_norm=2.5,
+    max_norm=2
 ) -> dict:
     """
     Run the training loop for nsteps minibatches of the dataloader
@@ -514,10 +516,10 @@ def train_epoch(
 
         inputs = Variable(inputs, requires_grad=False).to(device)
         # Forward propagate through the model
-        _, pred_outputs = model(inputs)
+        pred_outputs, pred_outputs_proj = model(inputs)
 
         if task in ["segmentation", "classification"]:
-            pred_outputs = softmax(pred_outputs)
+            pred_outputs = softmax(pred_outputs_proj)
 
             loss = f_loss(
                 pred_outputs,
@@ -673,10 +675,10 @@ def valid_epoch(
             inputs = Variable(inputs).to(device)
 
             # Forward propagate through the model
-            _, pred_outputs = model(inputs)
+            pred_outputs, pred_outputs_proj = model(inputs)
 
             if task in ["segmentation", "classification"]:
-                pred_outputs = softmax(pred_outputs)
+                pred_outputs = softmax(pred_outputs_proj)
 
                 loss = f_loss(
                     pred_outputs,
@@ -699,7 +701,6 @@ def valid_epoch(
                 #     iou += compute_batch_iou(
                 #         predictions_flat, labels_flat, ignore_index=ignore_index
                 #     )
-
             elif isinstance(f_loss, nn.MSELoss):
                 if inputs.dtype == torch.complex64:
                     inputs_loss = torch.abs(inputs).type(torch.float64)
@@ -1146,3 +1147,28 @@ def generate_unique_logpath(logdir: str, raw_run_name: str) -> str:
     os.makedirs(log_path)
 
     return log_path
+
+
+def log_images_and_metrics(
+    wandb_log: bool,
+    metrics: dict,
+) -> None:
+
+    if wandb_log:
+        logging.info("Logging to WandB")
+
+        # Prepare a dictionary for logging
+        log_data = {}
+        for key, value in metrics.items():
+            if isinstance(value, (list, tuple)) or hasattr(
+                value, "__iter__"
+            ):  # Check if value is an array-like
+                log_data[key] = wandb.Histogram(value)
+            else:
+                log_data[key] = value
+
+        # Log to WandB
+        wandb.log(log_data)
+
+    # Clear CUDA cache
+    torch.cuda.empty_cache()

@@ -630,7 +630,7 @@ def train(params: Union[list, dict], log_file=None) -> None:
             updated=updated,
         )
 
-        log_images_and_metrics(
+        utils.log_images_and_metrics(
             wandb_log,
             metrics,
         )
@@ -671,31 +671,6 @@ def save_checkpoint(
 
     if updated:
         torch.save(checkpoint, logdir / "best_model.pt")
-
-
-def log_images_and_metrics(
-    wandb_log: bool,
-    metrics: dict,
-) -> None:
-
-    if wandb_log:
-        logging.info("Logging to WandB")
-
-        # Prepare a dictionary for logging
-        log_data = {}
-        for key, value in metrics.items():
-            if isinstance(value, (list, tuple)) or hasattr(
-                value, "__iter__"
-            ):  # Check if value is an array-like
-                log_data[key] = wandb.Histogram(value)
-            else:
-                log_data[key] = value
-
-        # Log to WandB
-        wandb.log(log_data)
-
-    # Clear CUDA cache
-    torch.cuda.empty_cache()
 
 
 def test(params: list) -> None:
@@ -812,7 +787,7 @@ def test(params: list) -> None:
     )
     metrics.update(res)
 
-    log_images_and_metrics(wandb_log, metrics)
+    utils.log_images_and_metrics(wandb_log, metrics)
 
     if (
         isinstance(test_loader.dataset.dataset, (PolSFDataset, ALOSDataset, Bretigny))
@@ -985,11 +960,12 @@ def test(params: list) -> None:
                 sets_masks=sets_masks,
             )
         elif task == "reconstruction":
-            vis.plot_reconstruction_polsar_images(
+            res = vis.plot_reconstruction_polsar_images(
                 to_be_vizualized=to_be_vizualized,
                 logdir=logdir,
                 wandb_log=wandb_log,
                 dtype=dtype,
+                metrics=metrics,
             )
 
     elif task == "classification":
