@@ -54,89 +54,37 @@ We validate our method on three distinct naturally complex-valued Polarimetric S
 
 ## 🛠️ Installation
 
+This project uses [Poetry](https://python-poetry.org/) for dependency management.
+
 ```bash
 # Clone the repository
-git clone [https://github.com/QuentinGABOT/Equivariant_CVNN.git](https://github.com/QuentinGABOT/Equivariant_CVNN.git)
-cd Equivariant_CVNN
+git clone [https://github.com/QuentinGABOT/complex-valued-aes-for-polsar-reconstruction.git](https://github.com/QuentinGABOT/complex-valued-aes-for-polsar-reconstruction.git)
+cd complex-valued-aes-for-polsar-reconstruction
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies using Poetry
+poetry install
 ```
 
-### Requirements
-
-Ensure you have the following installed:
-
-* **Python**: >= 3.8
-* **PyTorch**: >= 1.10 (Complex support required)
-* **Numpy**
-* **Scipy**
-* **Matplotlib**
-* **torchcvnn**
-
+Alternatively, you can install it using pip via the pyproject.toml:
+```bash
+pip install -e .
+```
 
 ## 🚀 Usage
 
-To reproduce the experiments from the paper, we provide configuration files for each task and dataset. You can simply run the training by pointing to the desired config file using the following command:
+We provide configuration files (.yaml) to easily reproduce the experiments.
 
+To train the reconstruction models, use the runner script located in the projects/reconstruction/ folder, and point it to the desired configuration file in the configs/ directory:
 ```bash
-python -m torchtmpl.main <path_to_config_file> train
+# Train the Complex-Valued AutoEncoder (CVNN)
+poetry run python projects/reconstruction/run.py --config configs/config_reconstruction.yaml
 
+# Train the Real-Valued AutoEncoder baseline (RVNN)
+poetry run python projects/reconstruction/run.py --config configs/config_reconstruction_real.yaml
 ```
+(Note: Adjust the data paths within the .yaml configuration files to match the location of your downloaded datasets).
 
-Below is the list of available configurations corresponding to the experiments reported in the article.
-
-### 1. Classification (S1SLC_CVDL)
-
-We compare CVNN/RVNN baselines (APS, LPF) against our proposed LPS method with different projection layers.
-
-* **Baseline (APS):** `configs/s1slc/config_s1slc_cvnn_aps.yml`
-* **Baseline (LPF):** `configs/s1slc/config_s1slc_cvnn_lpf.yml`
-* **Ours (LPS + MLP):** `configs/s1slc/config_s1slc_cvnn_mlp_lps.yml` *(Best Performance)*
-* **Ours (LPS + PolyDec):** `configs/s1slc/config_s1slc_cvnn_poly_lps.yml`
-* **Ours (LPS + Norm):** `configs/s1slc/config_s1slc_cvnn_mod_lps.yml`
-
-**Example:**
-
-```bash
-# Train ResNet with LPS and MLP projection on S1SLC
-python -m torchtmpl.main configs/s1slc/config_s1slc_cvnn_mlp_lps.yml train
-
-```
-
-### 2. Semantic Segmentation (PolSF)
-
-For segmentation tasks using UNet, we also provide configurations for real-valued (RVNN) and complex-valued (CVNN) networks.
-
-* **Baseline (APS):** `configs/polsf/config_polsf_cvnn_aps.yml`
-* **Baseline (LPF):** `configs/polsf/config_polsf_cvnn_lpf.yml`
-* **Ours (LPS + PolyDec):** `configs/polsf/config_polsf_cvnn_poly_lps.yml` *(Best Performance)*
-* **Ours (LPS + MLP):** `configs/polsf/config_polsf_cvnn_mlp_lps.yml`
-
-**Example:**
-
-```bash
-# Train UNet with LPS and PolyDec projection on PolSF
-python -m torchtmpl.main configs/polsf/config_polsf_cvnn_poly_lps.yml train
-
-```
-
-### 3. Reconstruction (ALOS-2 San Francisco)
-
-Unsupervised reconstruction using AutoEncoders to preserve physical scattering properties.
-
-* **Baseline (APS):** `configs/sf_alos2/config_sf_alos2_cvnn_aps.yml`
-* **Baseline (LPF):** `configs/sf_alos2/config_sf_alos2_cvnn_lpf.yml`
-* **Ours (LPS + PolyDec):** `configs/sf_alos2/config_sf_alos2_cvnn_poly_lps.yml` *(Recommended)*
-* **Ours (LPS + MLP):** `configs/sf_alos2/config_sf_alos2_cvnn_mlp_lps.yml`
-
-**Example:**
-
-```bash
-# Train AutoEncoder with LPS and PolyDec projection on ALOS-2
-python -m torchtmpl.main configs/sf_alos2/config_sf_alos2_cvnn_poly_lps.yml train
-
-```
+We also provide some checkpoints for the reconstruction task in the checkpoints folder.
 
 ## 📊 Results
 

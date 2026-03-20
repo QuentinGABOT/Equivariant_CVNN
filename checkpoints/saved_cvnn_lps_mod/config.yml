@@ -1,0 +1,140 @@
+data:
+  batch_size: 32
+  cov_complex_value:
+  - - - 0.4536121892881158
+      - 0.0006769915134383425
+    - - 0.0006769915134383425
+      - 0.45153410068146554
+  - - - 0.021414104272613022
+      - -0.000165092342576663
+    - - -0.000165092342576663
+      - 0.022404017286819098
+  - - - 0.02208888093711576
+      - -0.0001926009709571475
+    - - -0.0001926009709571475
+      - 0.023051365063093954
+  - - - 0.21096950386648428
+      - -0.0002450374273718106
+    - - -0.0002450374273718106
+      - 0.20908614085263968
+  dataset:
+    crop_coordinates:
+      end_col: 3200
+      end_row: 7500
+      start_col: 1000
+      start_row: 3000
+    name: ALOSDataset
+    patch_size: 64
+    patch_stride: 64
+    trainpath: ../datasets/SAN_FRANCISCO_ALOS2
+  has_labels: false
+  inferred_input_channels: 4
+  inferred_input_size: 64
+  max_real_value:
+  - 108.35096740722656
+  - 57.574771881103516
+  - 56.268123626708984
+  - 72.82919311523438
+  mean_complex_value:
+  - - 0.00023267968110701054
+    - 3.7239257934965006e-05
+  - - 6.243977916427935e-05
+    - -1.519693000200048e-05
+  - - 3.587001032917956e-05
+    - 2.06368909062849e-06
+  - - 3.5507088437081637e-05
+    - -0.00010407397410041896
+  mean_imag:
+  - 3.7239257934965006e-05
+  - -1.519693000200048e-05
+  - 2.06368909062849e-06
+  - -0.00010407397410041896
+  mean_real:
+  - 0.00023267968110701054
+  - 6.243977916427935e-05
+  - 3.587001032917956e-05
+  - 3.5507088437081637e-05
+  mean_real_value:
+  - 0.00023267968110701054
+  - 6.243977916427935e-05
+  - 3.587001032917956e-05
+  - 3.5507088437081637e-05
+  min_real_value:
+  - 2.1424446458695456e-05
+  - 1.1317729331494775e-05
+  - 5.429208613350056e-05
+  - 5.739567131968215e-05
+  num_channels: 4
+  num_workers: 4
+  recompute_statistics: false
+  shuffle: true
+  std_imag:
+  - 0.671962871505164
+  - 0.14967971568258373
+  - 0.15182676003621348
+  - 0.45725938027845825
+  std_real:
+  - 0.6735073787926275
+  - 0.14633558785412734
+  - 0.1486232853126177
+  - 0.4593141668471421
+  std_real_value:
+  - 0.6735073787926275
+  - 0.14633558785412734
+  - 0.1486232853126177
+  - 0.4593141668471421
+  supports_full_image_reconstruction: true
+  test_ratio: 0.1
+  transforms:
+  - name: logamplitude
+  type: polsar
+  valid_ratio: 0.1
+evaluation:
+  check_invariance: true
+  domain: spatial
+logging:
+  logdir: ./logs
+  wandb:
+    entity: complex-gen-ai-sar
+    name: autoencoder
+    project: reconstruction_sf_alos2
+    run_id: 9ntjnzfk
+loss:
+  name: MSE
+mode: full
+model:
+  activation: modReLU
+  channels_width: 64
+  class: AutoEncoder
+  downsampling_layer: LPD
+  dropout: 0.0
+  layer_mode: complex
+  normalization_layer: batch
+  num_blocks: 1
+  num_layers: 2
+  projection_layer: amplitude
+  residual: true
+  upsampling_layer: LPU
+nepochs: 50
+optim:
+  algo: AdamW
+  max_norm: 0.01
+  params:
+    betas:
+    - 0.9
+    - 0.999
+    lr: 0.0005
+    weight_decay: 0.001
+scheduler:
+  name: ReduceLROnPlateau
+  params:
+    factor: 0.99
+    min_lr: 5.0e-05
+    mode: min
+    patience: 5
+seed: 4454
+task: reconstruction
+train: null
+warmup:
+  epochs: 5
+world_size: 4

@@ -1,0 +1,54 @@
+# Task-specific configuration for Reconstruction task
+task: reconstruction
+
+# Data configuration specific to reconstruction
+data:
+  recompute_statistics: True
+  shuffle: True
+  batch_size: 32
+  dataset:
+    name: ALOSDataset
+    trainpath: ../datasets/SAN_FRANCISCO_ALOS2
+    patch_size: 64
+    patch_stride: 64
+    crop_coordinates:
+      end_col: 3200
+      end_row: 7500
+      start_col: 1000
+      start_row: 3000
+  num_workers: 4
+  test_ratio: 0.1
+  valid_ratio: 0.1
+  transforms:
+    - name: logamplitude
+  real_pipeline_type: complex_dual_real
+                    
+# Model configuration specific to reconstruction
+model:
+  activation: ReLU
+  channels_width: 48
+  class: AutoEncoder
+  layer_mode: real
+  num_layers: 2
+  num_blocks: 1
+  normalization_layer: batch
+  downsampling_layer: LPF
+  upsampling_layer: bilinear
+  residual: True
+  dropout: 0.0
+
+evaluation:
+  check_invariance: True
+  domain: spatial
+
+# Logging configuration
+logging:
+  logdir: ./logs
+  wandb:
+    entity: complex-gen-ai-sar
+    project: reconstruction_sf_alos2
+    name: autoencoder
+
+# Loss configuration
+loss:
+  name: MSE

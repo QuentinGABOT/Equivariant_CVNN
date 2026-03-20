@@ -1,0 +1,310 @@
+Logdir: logs/reconstruction_youthful-microwave-43
+## Command
+/home/qgabot/Documents/Equivariant_CVNN/src/cvnn/__main__.py configs/sf_alos2/cvnn_lps_mod.yaml --mode full
+
+Config: {'data': {'recompute_statistics': False, 'shuffle': True, 'batch_size': 32, 'dataset': {'name': 'ALOSDataset', 'trainpath': '../datasets/SAN_FRANCISCO_ALOS2', 'patch_size': 64, 'patch_stride': 64, 'crop_coordinates': {'end_col': 3200, 'end_row': 7500, 'start_col': 1000, 'start_row': 3000}}, 'num_workers': 4, 'test_ratio': 0.1, 'valid_ratio': 0.1, 'transforms': [{'name': 'logamplitude'}], 'has_labels': False, 'supports_full_image_reconstruction': True, 'type': 'polsar', 'num_channels': 4, 'min_real_value': [2.1424446458695456e-05, 1.1317729331494775e-05, 5.429208613350056e-05, 5.739567131968215e-05], 'max_real_value': [108.35096740722656, 57.574771881103516, 56.268123626708984, 72.82919311523438], 'mean_real': [0.00023267968110701054, 6.243977916427935e-05, 3.587001032917956e-05, 3.5507088437081637e-05], 'mean_imag': [3.7239257934965006e-05, -1.519693000200048e-05, 2.06368909062849e-06, -0.00010407397410041896], 'std_real': [0.6735073787926275, 0.14633558785412734, 0.1486232853126177, 0.4593141668471421], 'std_imag': [0.671962871505164, 0.14967971568258373, 0.15182676003621348, 0.45725938027845825], 'mean_real_value': [0.00023267968110701054, 6.243977916427935e-05, 3.587001032917956e-05, 3.5507088437081637e-05], 'std_real_value': [0.6735073787926275, 0.14633558785412734, 0.1486232853126177, 0.4593141668471421], 'mean_complex_value': [[0.00023267968110701054, 3.7239257934965006e-05], [6.243977916427935e-05, -1.519693000200048e-05], [3.587001032917956e-05, 2.06368909062849e-06], [3.5507088437081637e-05, -0.00010407397410041896]], 'cov_complex_value': [[[0.4536121892881158, 0.0006769915134383425], [0.0006769915134383425, 0.45153410068146554]], [[0.021414104272613022, -0.000165092342576663], [-0.000165092342576663, 0.022404017286819098]], [[0.02208888093711576, -0.0001926009709571475], [-0.0001926009709571475, 0.023051365063093954]], [[0.21096950386648428, -0.0002450374273718106], [-0.0002450374273718106, 0.20908614085263968]]], 'inferred_input_size': 64, 'inferred_input_channels': 4}, 'model': {'activation': 'modReLU', 'channels_width': 64, 'class': 'AutoEncoder', 'layer_mode': 'complex', 'num_layers': 2, 'num_blocks': 1, 'normalization_layer': 'batch', 'downsampling_layer': 'LPD', 'upsampling_layer': 'LPU', 'residual': True, 'dropout': 0.0, 'projection_layer': 'amplitude'}, 'train': None, 'nepochs': 50, 'mode': 'full', 'world_size': 4, 'seed': 4454, 'optim': {'algo': 'AdamW', 'params': {'lr': 0.0005, 'weight_decay': 0.001, 'betas': [0.9, 0.999]}, 'max_norm': 0.01}, 'scheduler': {'name': 'ReduceLROnPlateau', 'params': {'mode': 'min', 'factor': 0.99, 'patience': 5, 'min_lr': 5e-05}}, 'warmup': {'epochs': 5}, 'task': 'reconstruction', 'evaluation': {'check_invariance': True, 'domain': 'spatial'}, 'logging': {'logdir': './logs', 'wandb': {'entity': 'complex-gen-ai-sar', 'project': 'reconstruction_sf_alos2', 'name': 'autoencoder', 'run_id': '9ntjnzfk'}}, 'loss': {'name': 'MSE'}}
+
+Wandb run name: youthful-microwave-43
+
+## Summary of the model architecture
+====================================================================================================
+Layer (type:depth-idx)                                                      Param #
+====================================================================================================
+AutoEncoder                                                                 --
+├─ConvNet: 1-1                                                              --
+│    └─Sequential: 2-1                                                      --
+│    │    └─SingleConv: 3-1                                                 2,368
+│    │    └─Down: 3-2                                                       527,492
+│    │    └─Down: 3-3                                                       2,103,556
+│    └─Sequential: 2-2                                                      --
+│    └─Sequential: 2-3                                                      --
+│    └─Sequential: 2-4                                                      --
+│    │    └─Up: 3-4                                                         380,036
+│    │    └─Up: 3-5                                                         95,812
+│    │    └─SingleConv: 3-6                                                 260
+====================================================================================================
+Total params: 3,109,524
+Trainable params: 3,109,524
+Non-trainable params: 0
+====================================================================================================
+
+AutoEncoder(
+  (convnet): ConvNet(
+    (encoder): Sequential(
+      (0): SingleConv(
+        (conv): ConvBlock(
+          (conv_block): Sequential(
+            (0): BaseConv2d(
+              (conv): Conv2d(4, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+            )
+            (1): Identity()
+            (2): Identity()
+          )
+        )
+        (projection): Identity()
+      )
+      (1): Down(
+        (down): PolyphaseInvariantDown2D(
+          (component_selection): LPS(
+            (get_logits): LPSLogitLayersV2(
+              (conv): DoubleConv(
+                (block): Sequential(
+                  (0): ConvBlock(
+                    (conv_block): Sequential(
+                      (0): BaseConv2d(
+                        (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                      )
+                      (1): BatchNorm2d()
+                      (2): modReLU()
+                    )
+                  )
+                  (1): ConvBlock(
+                    (conv_block): Sequential(
+                      (0): BaseConv2d(
+                        (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                      )
+                      (1): BatchNorm2d()
+                      (2): modReLU()
+                    )
+                  )
+                )
+                (residual_connection): Identity()
+              )
+              (projection): Mod()
+            )
+            (gumbel_softmax): GumbelSoftmax()
+            (softmax): Softmax()
+          )
+        )
+        (convs): Sequential(
+          (0): DoubleConv(
+            (block): Sequential(
+              (0): ConvBlock(
+                (conv_block): Sequential(
+                  (0): BaseConv2d(
+                    (conv): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                  )
+                  (1): BatchNorm2d()
+                  (2): modReLU()
+                )
+              )
+              (1): ConvBlock(
+                (conv_block): Sequential(
+                  (0): BaseConv2d(
+                    (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                  )
+                  (1): BatchNorm2d()
+                  (2): modReLU()
+                )
+              )
+            )
+            (residual_connection): BaseConv2d(
+              (conv): Conv2d(64, 128, kernel_size=(1, 1), stride=(1, 1), padding_mode=circular)
+            )
+          )
+        )
+      )
+      (2): Down(
+        (down): PolyphaseInvariantDown2D(
+          (component_selection): LPS(
+            (get_logits): LPSLogitLayersV2(
+              (conv): DoubleConv(
+                (block): Sequential(
+                  (0): ConvBlock(
+                    (conv_block): Sequential(
+                      (0): BaseConv2d(
+                        (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                      )
+                      (1): BatchNorm2d()
+                      (2): modReLU()
+                    )
+                  )
+                  (1): ConvBlock(
+                    (conv_block): Sequential(
+                      (0): BaseConv2d(
+                        (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                      )
+                      (1): BatchNorm2d()
+                      (2): modReLU()
+                    )
+                  )
+                )
+                (residual_connection): Identity()
+              )
+              (projection): Mod()
+            )
+            (gumbel_softmax): GumbelSoftmax()
+            (softmax): Softmax()
+          )
+        )
+        (convs): Sequential(
+          (0): DoubleConv(
+            (block): Sequential(
+              (0): ConvBlock(
+                (conv_block): Sequential(
+                  (0): BaseConv2d(
+                    (conv): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                  )
+                  (1): BatchNorm2d()
+                  (2): modReLU()
+                )
+              )
+              (1): ConvBlock(
+                (conv_block): Sequential(
+                  (0): BaseConv2d(
+                    (conv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                  )
+                  (1): BatchNorm2d()
+                  (2): modReLU()
+                )
+              )
+            )
+            (residual_connection): BaseConv2d(
+              (conv): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), padding_mode=circular)
+            )
+          )
+        )
+      )
+    )
+    (bridge): Sequential()
+    (bottleneck): Sequential()
+    (decoder): Sequential(
+      (0): Up(
+        (conv_adjust): DoubleConv(
+          (block): Sequential(
+            (0): ConvBlock(
+              (conv_block): Sequential(
+                (0): BaseConv2d(
+                  (conv): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1), padding_mode=circular)
+                )
+                (1): BatchNorm2d()
+                (2): modReLU()
+              )
+            )
+            (1): ConvBlock(
+              (conv_block): Sequential(
+                (0): BaseConv2d(
+                  (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), padding_mode=circular)
+                )
+                (1): BatchNorm2d()
+                (2): modReLU()
+              )
+            )
+          )
+          (residual_connection): BaseConv2d(
+            (conv): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1), padding_mode=circular)
+          )
+        )
+        (up): PolyphaseInvariantUp2D(
+          (softmax): Softmax()
+          (component_selection): LPS_u(
+            (softmax): Softmax()
+            (gumbel_softmax): GumbelSoftmax()
+          )
+        )
+        (convs): Sequential(
+          (0): DoubleConv(
+            (block): Sequential(
+              (0): ConvBlock(
+                (conv_block): Sequential(
+                  (0): BaseConv2d(
+                    (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                  )
+                  (1): BatchNorm2d()
+                  (2): modReLU()
+                )
+              )
+              (1): ConvBlock(
+                (conv_block): Sequential(
+                  (0): BaseConv2d(
+                    (conv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                  )
+                  (1): BatchNorm2d()
+                  (2): modReLU()
+                )
+              )
+            )
+            (residual_connection): Identity()
+          )
+        )
+      )
+      (1): Up(
+        (conv_adjust): DoubleConv(
+          (block): Sequential(
+            (0): ConvBlock(
+              (conv_block): Sequential(
+                (0): BaseConv2d(
+                  (conv): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1), padding_mode=circular)
+                )
+                (1): BatchNorm2d()
+                (2): modReLU()
+              )
+            )
+            (1): ConvBlock(
+              (conv_block): Sequential(
+                (0): BaseConv2d(
+                  (conv): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), padding_mode=circular)
+                )
+                (1): BatchNorm2d()
+                (2): modReLU()
+              )
+            )
+          )
+          (residual_connection): BaseConv2d(
+            (conv): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1), padding_mode=circular)
+          )
+        )
+        (up): PolyphaseInvariantUp2D(
+          (softmax): Softmax()
+          (component_selection): LPS_u(
+            (softmax): Softmax()
+            (gumbel_softmax): GumbelSoftmax()
+          )
+        )
+        (convs): Sequential(
+          (0): DoubleConv(
+            (block): Sequential(
+              (0): ConvBlock(
+                (conv_block): Sequential(
+                  (0): BaseConv2d(
+                    (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                  )
+                  (1): BatchNorm2d()
+                  (2): modReLU()
+                )
+              )
+              (1): ConvBlock(
+                (conv_block): Sequential(
+                  (0): BaseConv2d(
+                    (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), padding_mode=circular)
+                  )
+                  (1): BatchNorm2d()
+                  (2): modReLU()
+                )
+              )
+            )
+            (residual_connection): Identity()
+          )
+        )
+      )
+      (2): SingleConv(
+        (conv): ConvBlock(
+          (conv_block): Sequential(
+            (0): BaseConv2d(
+              (conv): Conv2d(64, 4, kernel_size=(1, 1), stride=(1, 1), padding_mode=circular)
+            )
+            (1): Identity()
+            (2): Identity()
+          )
+        )
+        (projection): Identity()
+      )
+    )
+  )
+)
+
+## Datasets:
+Train: <torch.utils.data.dataset.Subset object at 0x7eeb69c76360>
+Validation: <torch.utils.data.dataset.Subset object at 0x7eeb69c74d70>
+Test: <torch.utils.data.dataset.Subset object at 0x7eeb69c776e0>
+Full image: <cvnn.datasets.GenericDatasetWrapper object at 0x7eeb69b43410>

@@ -1,0 +1,29 @@
+# Generic configuration
+
+# Training configuration
+nepochs: 50
+mode: full
+world_size: 4
+seed: 4454
+
+# Optimizer configuration
+optim:
+  algo: AdamW
+  params:
+    lr: 0.0005
+    weight_decay: 0.001
+    betas: [0.9, 0.999]
+  max_norm: 0.01
+
+# Scheduler configuration
+scheduler:
+  name: ReduceLROnPlateau
+  params:
+    mode: min
+    factor: 0.99
+    patience: 5
+    min_lr: 0.00005
+
+# Warmup configuration
+warmup:
+  epochs: 5
