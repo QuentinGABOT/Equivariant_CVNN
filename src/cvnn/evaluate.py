@@ -11,39 +11,14 @@ from abc import ABC, abstractmethod
 ### Third-party imports
 import torch
 import numpy as np
-from torchmetrics.image.fid import FrechetInceptionDistance
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
-from tqdm import tqdm
 
 ### Local imports
 from cvnn.utils import setup_logging, count_model_parameters
 from cvnn.data_processing import dual_real_to_complex_transform
-from cvnn.metrics_registry import MetricsRegistry, CustomFID
+from cvnn.metrics_registry import MetricsRegistry
 
 logger = setup_logging(__name__)
 
-# ==============================================================================
-# Helper Class for CustomFID
-# ==============================================================================
-
-class _FakeDataLoader:
-    """
-    Wrapper interne pour simuler un DataLoader infini qui génère des images depuis le VAE.
-    Nécessaire pour l'interface de CustomFID.
-    """
-    def __init__(self, model, batch_size, device):
-        self.model = model
-        self.batch_size = batch_size
-        self.device = device
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        with torch.no_grad():
-            samples = self.model.sample(self.batch_size)
-            return samples.to(self.device)
         
 # ==============================================================================
 # 1. Base Evaluator
@@ -280,104 +255,6 @@ class ReconstructionEvaluator(BaseEvaluator):
         
         return metrics
     
-class GenerationEvaluator(ReconstructionEvaluator):
-    def __init__(self, model, test_loader, cfg, task, device=None):
-        super().__init__(model, test_loader, cfg, task, device)
-        
-        # 1. Standard Inception FID (Baseline)
-        self.fid = FrechetInceptionDistance(feature=64, normalize=True).to(self.device)
-        
-        # 2. Custom Domain-Aware FID (Ours)
-        if CustomFID is not None:
-            dataset_name = cfg.get("data").get("dataset").get("name").lower()          
-            try:
-                self.custom_fid = CustomFID(dataset_name=dataset_name, device=self.device)
-                logger.info(f"CustomFID initialized for dataset: {dataset_name}")
-            except (FileNotFoundError, ValueError) as e:
-                logger.warning(f"CustomFID skipped: {e} (Ensure you ran train_feature_extractor.py)")
-            except Exception as e:
-                logger.warning(f"CustomFID failed to init: {e}")
-
-    def evaluate(self) -> Dict[str, float]:
-        # 1. Run the Hybrid Reconstruction Eval (Spectral + Spatial)
-        metrics = super().evaluate()
-        
-        # 2. Add Generative Metrics (FID Standard + Custom)
-        gen_metrics = self.evaluate_generative_metrics(num_samples=5000)
-        
-        metrics["metrics"].update(gen_metrics)
-                
-        return metrics
-
-    def _prepare_for_inception(self, tensor: torch.Tensor) -> torch.Tensor:
-        """
-        Converts CVNN output to format expected by InceptionV3.
-        """
-        if not torch.is_complex(tensor):
-            tensor = dual_real_to_complex_transform(tensor)
-
-        if torch.is_complex(tensor):
-            if self._is_spectral_data():
-                 tensor = torch.fft.ifft2(torch.fft.ifftshift(tensor)).abs()
-            else:
-                tensor = tensor.abs()
-
-        B, C, H, W = tensor.shape
-        flat = tensor.view(B, -1)
-        min_val = flat.min(dim=1, keepdim=True)[0].view(B, 1, 1, 1)
-        max_val = flat.max(dim=1, keepdim=True)[0].view(B, 1, 1, 1)
-        tensor = (tensor - min_val) / (max_val - min_val + 1e-8)
-
-        if C == 1:
-            tensor = tensor.repeat(1, 3, 1, 1)
-        elif C > 3:
-            tensor = tensor[:, :3, :, :] 
-        
-        elif C == 2:
-             tensor = tensor.mean(dim=1, keepdim=True).repeat(1, 3, 1, 1)
-
-        return tensor
-
-    def evaluate_generative_metrics(self, num_samples=5000) -> Dict[str, float]:
-        results = {}
-        
-        self.fid.reset()
-        
-        # Collect Stats
-        with torch.no_grad():
-            # Real
-            for i, batch in enumerate(self.loader):
-                if i >= num_samples: break
-                real_imgs = batch[0] if isinstance(batch, (tuple, list)) else batch
-                real_imgs = real_imgs.to(self.device)
-                real_rgb = self._prepare_for_inception(real_imgs)
-                self.fid.update(real_rgb, real=True)
-
-            # Fake
-            required_fake = self.fid.real_features_num_samples
-            total_fake = 0
-            while total_fake < required_fake:
-                batch_size = min(self.loader.batch_size, required_fake - total_fake)
-                fake_raw = self.model.sample(batch_size).to(self.device)
-                fake_rgb = self._prepare_for_inception(fake_raw)
-                self.fid.update(fake_rgb, real=False)
-                total_fake += batch_size
-
-            results["fid_imagenet_baseline"] = self.fid.compute().item()
-
-        # --- B. Custom Domain-Aware FID ---
-        if self.custom_fid is not None:
-            fake_loader_wrapper = _FakeDataLoader(self.model, self.loader.batch_size, self.device)
-            
-            custom_score = self.custom_fid.compute_fid(
-                real_loader=self.loader,
-                fake_loader=fake_loader_wrapper,
-                num_samples=5000
-            )
-            results["fid_custom"] = custom_score
-
-        return results
-    
 class SegmentationEvaluator(BaseEvaluator):
     def process_batch(self, batch: Any) -> Tuple[torch.Tensor, torch.Tensor]:
         inputs, targets = batch
@@ -425,8 +302,6 @@ class ClassificationEvaluator(BaseEvaluator):
 def get_evaluator(task: str, model, loader, cfg, device=None) -> BaseEvaluator:
     if task == "reconstruction":
         return ReconstructionEvaluator(model, loader, cfg, task, device)
-    elif task == "generation":
-        return GenerationEvaluator(model, loader, cfg, task, device)
     elif task == "segmentation":
         return SegmentationEvaluator(model, loader, cfg, task, device)
     elif task == "classification":
@@ -503,35 +378,3 @@ def extract_latents_for_probing(model, loader, device, max_samples=None):
             y = y[:max_samples]
     
     return X, y
-
-def compute_linear_probing(model, train_loader, test_loader, device, max_samples=5000) -> Optional[float]:
-    """
-    Trains a Logistic Regression on train_loader latents and evaluates on test_loader.
-    Returns Accuracy (0.0 to 1.0).
-    """   
-    # 1. Extract Train Latents
-    X_train, y_train = extract_latents_for_probing(model, train_loader, device, max_samples=max_samples)
-    if X_train is None or y_train is None:
-        logger.warning("Linear Probing skipped: No labels found in training data (Unsupervised dataset?).")
-        return None
-
-    # 2. Extract Test Latents
-    X_test, y_test = extract_latents_for_probing(model, test_loader, device, max_samples=max_samples)
-    if X_test is None or y_test is None:
-        logger.warning("Linear Probing skipped: No labels found in test data.")
-        return None
-
-    # 3. Train Classifier
-    # Max iter increased for convergence
-    clf = LogisticRegression(solver='lbfgs', max_iter=1000)
-    try:
-        clf.fit(X_train, y_train)
-    except Exception as e:
-        logger.error(f"Linear Probing Failed during fit: {e}")
-        return None
-
-    # 4. Evaluate
-    y_pred = clf.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
-    
-    return acc

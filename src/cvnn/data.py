@@ -10,15 +10,14 @@ from typing import List, Optional, Tuple, Union, Any
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
-from torchcvnn.datasets import ALOSDataset, Bretigny, PolSFDataset, S1SLC, MSTARTargets
-from torchvision.datasets import MNIST, CIFAR10
+from torchcvnn.datasets import ALOSDataset, Bretigny, PolSFDataset, S1SLC
 
 # Local imports
 from cvnn.transform_registry import build_transform_pipeline
 from cvnn.utils import setup_logging
 from cvnn.dataset_registry import get_dataset_info
 from cvnn.data_splitting import get_label_based_split_indices
-from cvnn.datasets import Sethi, GenericDatasetWrapper, FlatCMRxRecon, MSTARClean
+from cvnn.datasets import Sethi, GenericDatasetWrapper
 from cvnn.data_statistics import compute_dataset_statistics
 
 # module-level logger
@@ -119,27 +118,6 @@ def _create_dataset(cfg: dict, transform: Optional[Any] = None, dataset_config: 
     elif dataset_name == "S1SLC":
         return S1SLC(
             root=dataset_config["trainpath"], transform=transform, lazy_loading=False
-        )
-    elif dataset_name == "MNIST":
-        return MNIST(
-            root=dataset_config["trainpath"],
-            train=True,
-            transform=transform,
-        )
-    elif dataset_name == "MSTARTargets":
-        return MSTARTargets(
-            rootdir=dataset_config["trainpath"],
-            transform=transform,
-        )
-    elif dataset_name == "MSTARClean":
-        return MSTARClean(
-            root=dataset_config["trainpath"],
-            transform=transform,
-        )
-    elif dataset_name == "FlatCMRxRecon":
-        return FlatCMRxRecon(
-            root=dataset_config["trainpath"],
-            transform=transform,
         )
     else:
         raise ValueError(f"Unknown dataset name: {dataset_name}")
@@ -342,18 +320,6 @@ def get_dataloaders(cfg: dict, use_cuda: bool) -> Tuple[DataLoader, DataLoader]:
         
         if dataset_config["dataset_name"] == "Bretigny":
             stat_dataset = _create_bretigny_dataset(cfg, "train", stat_transform, dataset_config)
-        elif dataset_config["dataset_name"] == "MNIST":
-            stat_dataset = MNIST(
-                root=dataset_config["trainpath"],
-                train=True,
-                transform=stat_transform,
-            )
-        elif dataset_config["dataset_name"] == "CIFAR10":
-            stat_dataset = CIFAR10(
-                root=dataset_config["trainpath"],
-                train=True,
-                transform=stat_transform,
-            )
         else:
             base_dataset_stat = _create_dataset(cfg, stat_transform, dataset_config)
             stat_dataset = Subset(base_dataset_stat, train_indices)
@@ -374,30 +340,6 @@ def get_dataloaders(cfg: dict, use_cuda: bool) -> Tuple[DataLoader, DataLoader]:
     if dataset_config["dataset_name"] == "Bretigny":
         train_dataset = _create_bretigny_dataset(cfg, "train", train_transform, dataset_config)
         valid_dataset = _create_bretigny_dataset(cfg, "valid", eval_transform, dataset_config)
-    elif dataset_config["dataset_name"] == "MNIST":
-        base_train_dataset = MNIST(root=dataset_config["trainpath"], train=True, transform=train_transform)
-        base_eval_dataset  = MNIST(root=dataset_config["trainpath"], train=True, transform=eval_transform)
-        
-        base_train_dataset = Subset(base_train_dataset, torch.randperm(len(base_train_dataset))[:10000])  # Take a subset of the training dataset, 10000 random images
-        train_len = len(base_train_dataset)
-        first_split = int(train_len * cfg["data"].get("valid_ratio"))
-        second_split = train_len - first_split
-        
-        indices = torch.randperm(train_len).tolist()
-        train_dataset = Subset(base_train_dataset, indices[:second_split])
-        valid_dataset = Subset(base_eval_dataset, indices[second_split:])    
-    elif dataset_config["dataset_name"] == "CIFAR10":
-        base_train_dataset = CIFAR10(root=dataset_config["trainpath"], train=True, transform=train_transform)
-        base_eval_dataset  = CIFAR10(root=dataset_config["trainpath"], train=True, transform=eval_transform)
-        
-        base_train_dataset = Subset(base_train_dataset, torch.randperm(len(base_train_dataset))[:10000])  # Take a subset of the training dataset, 10000 random images
-        train_len = len(base_train_dataset)
-        first_split = int(train_len * cfg["data"].get("valid_ratio"))
-        second_split = train_len - first_split
-        
-        indices = torch.randperm(train_len).tolist()
-        train_dataset = Subset(base_train_dataset, indices[:second_split])
-        valid_dataset = Subset(base_eval_dataset, indices[second_split:])
     else:
         base_train_dataset = _create_dataset(cfg, train_transform, dataset_config)
         base_eval_dataset  = _create_dataset(cfg, eval_transform, dataset_config)
@@ -434,10 +376,6 @@ def get_dataloaders(cfg: dict, use_cuda: bool) -> Tuple[DataLoader, DataLoader]:
     if test_indices is not None or (dataset_config["dataset_name"] in ["Bretigny", "MNIST", "CIFAR10"]):
         if dataset_config["dataset_name"] == "Bretigny":
             test_dataset = _create_bretigny_dataset(cfg, "test", eval_transform, dataset_config)
-        elif dataset_config["dataset_name"] == "MNIST":
-            test_dataset = MNIST(root=dataset_config["trainpath"], train=False, transform=eval_transform)
-        elif dataset_config["dataset_name"] == "CIFAR10":
-            test_dataset = CIFAR10(root=dataset_config["trainpath"], train=False, transform=eval_transform)             
         test_loader = torch.utils.data.DataLoader(
             test_dataset,
             batch_size=cfg["data"]["batch_size"],

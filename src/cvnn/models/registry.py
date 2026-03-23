@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Type
 import torch.nn as nn
 
 # Local imports
-from .models import AutoEncoder, LatentAutoEncoder
+from .models import AutoEncoder
 
 # Global model registry
 _MODEL_REGISTRY: Dict[str, Type[nn.Module]] = {}
@@ -47,10 +47,7 @@ def create_model(name: str, **kwargs) -> nn.Module:
 
 # Register built-in models
 register_model("AutoEncoder")(AutoEncoder)
-register_model("LatentAutoEncoder")(LatentAutoEncoder)
 
 # Add aliases for backward compatibility
 _MODEL_REGISTRY["autoencoder"] = AutoEncoder
 _MODEL_REGISTRY["ae"] = AutoEncoder
-_MODEL_REGISTRY["latent_autoencoder"] = LatentAutoEncoder
-_MODEL_REGISTRY["latent_ae"] = LatentAutoEncoder

@@ -11,7 +11,7 @@ import torchinfo
 
 # Local imports
 from cvnn.config_utils import get_model_params
-from cvnn.models import AutoEncoder, LatentAutoEncoder, VariationalAutoEncoder, ResNet, UNet
+from cvnn.models import AutoEncoder, ResNet, UNet
 from cvnn.utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -38,7 +38,7 @@ def build_autoencoder(
 
     Args:
         cfg: Configuration dictionary
-        model_class: Class name ("AutoEncoder" or "LatentAutoEncoder")
+        model_class: Class name ("AutoEncoder")
 
     Returns:
         Configured autoencoder model
@@ -50,37 +50,9 @@ def build_autoencoder(
         # Remove latent_dim if present (not needed for basic AutoEncoder)
         model_params.pop("latent_dim", None)
         return AutoEncoder(**model_params)
-
-    elif model_class == "LatentAutoEncoder":
-        # latent_dim is required for LatentAutoEncoder
-        if "latent_dim" not in model_params:
-            raise ValueError("LatentAutoEncoder requires latent_dim in config")
-        return LatentAutoEncoder(**model_params)
-
     else:
         raise ValueError(f"Unknown autoencoder class: {model_class}")
 
-def build_variational_autoencoder(
-    cfg: Dict[str, Any]
-) -> nn.Module:
-    """
-    Build an autoencoder model based on configuration.
-
-    Args:
-        cfg: Configuration dictionary
-        model_class: Class name ("VariationalAutoEncoder")
-
-    Returns:
-        Configured autoencoder model
-    """
-    model_params = get_model_params(cfg)
-    model_params.pop("num_classes", None)
-
-    # latent_dim is required for VariationalAutoEncoder
-    if "latent_dim" not in model_params:
-        raise ValueError("VariationalAutoEncoder requires latent_dim in config")
-    
-    return VariationalAutoEncoder(**model_params)
 
 def build_unet(cfg: Dict[str, Any]) -> nn.Module:
     """
@@ -165,9 +137,6 @@ def build_model_from_config(cfg: Dict[str, Any], task: str) -> nn.Module:
 
     elif task == "segmentation":
         return build_unet(cfg)
-
-    elif task == "generation":
-        return build_variational_autoencoder(cfg)
 
     elif task == "classification":
         return build_resnet(cfg)

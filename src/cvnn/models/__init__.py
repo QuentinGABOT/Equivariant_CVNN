@@ -1,13 +1,12 @@
 # Local imports
 from .base import BaseAutoEncoder, BaseComplexModel, BaseModel
-from .models import AutoEncoder, LatentAutoEncoder, VariationalAutoEncoder, ResNet, UNet
+from .models import AutoEncoder, ResNet, UNet
 from .registry import create_model, get_model, list_models, register_model
 
 __all__ = [
     # Models
     "AutoEncoder",
-    "LatentAutoEncoder",
-    "VariationalAutoEncoder",
+
     "UNet",
     "ResNet",
     # Base classes

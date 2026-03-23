@@ -16,11 +16,10 @@ from torch.nn import MSELoss
 
 # Local imports
 from cvnn.callbacks import ModelCheckpoint
-from cvnn.losses import compute_class_weights, ELBOLoss, ComplexELBOLoss
+from cvnn.losses import compute_class_weights
 from cvnn.models.utils import get_loss_function
 from cvnn.schedulers import build_schedulers, step_schedulers
-from cvnn.utils import setup_logging, kl_sanity_checks, KLAnnealing
-from cvnn.models.blocks import Down
+from cvnn.utils import setup_logging
 
 # initialize module-level logger
 logger = setup_logging(__name__)
@@ -34,7 +33,6 @@ def train_one_epoch(
     warmup_scheduler: Optional[Any] = None,
     scheduler: Optional[Any] = None,
     step_on_batch: bool = False,
-    anneal=None,
     max_norm: Optional[float] = None,
 ) -> dict:
     """
@@ -71,10 +69,7 @@ def train_one_epoch(
         optimizer.zero_grad()
         outputs = model(inputs)
             
-        if isinstance(loss_fn, (ELBOLoss, ComplexELBOLoss)):
-            # Pass anneal if your loss supports it
-            loss_output = loss_fn(outputs, inputs, anneal=anneal)
-        elif isinstance(loss_fn, (ComplexMSELoss, MSELoss)):
+        if isinstance(loss_fn, (ComplexMSELoss, MSELoss)):
             loss_output = loss_fn(outputs, inputs)
         else:
             _, outputs_projected = outputs if isinstance(outputs, (tuple, list)) and len(outputs) == 2 else (None, outputs)
@@ -142,7 +137,6 @@ def validate_one_epoch(
     valid_loader: torch.utils.data.DataLoader,
     loss_fn: Callable,
     device: torch.device,
-    anneal=None,
 ) -> dict:
     """
     Run one validation epoch.
@@ -179,8 +173,8 @@ def validate_one_epoch(
             outputs = model(inputs)
 
             # Compute Loss
-            if isinstance(loss_fn, (ELBOLoss, ComplexELBOLoss)):
-                loss_output = loss_fn(outputs, inputs, anneal=anneal) 
+            if isinstance(loss_fn, (ComplexMSELoss, MSELoss)):
+                loss_output = loss_fn(outputs, inputs)
             else:
                 _, outputs_projected = outputs if isinstance(outputs, (tuple, list)) and len(outputs) == 2 else (None, outputs)
                 loss_output = loss_fn(outputs_projected, targets)
@@ -246,33 +240,12 @@ def setup_loss_optimizer(
         )
     else:
         class_weights = None
-    
-    schedule = cfg["loss"].get("schedule")
-    if schedule == "beta":
-        beta_max = float(cfg["loss"].get("beta_max"))
-        bpd_target = None
-    else:
-        beta_max = None
-        if schedule == "capacity":
-            bpd_target = float(cfg["loss"].get("bpd_target"))
-        else:
-            bpd_target = None
-                
-    cov_mode = cfg["model"].get("cov_mode")
-    standard_reparam = cfg["model"].get("standard_reparam")
-    if "decoder_variance" in cfg["model"]:
-        learned_variance = cfg["model"]["decoder_variance"].get("learned_variance")
-        min_log_sigma = cfg["model"]["decoder_variance"].get("min_log_sigma")
-    else:
-        learned_variance = None
-        min_log_sigma = None
-
+                    
     # Try to use mode-aware loss selection first
-    loss_fn = get_loss_function(loss_name, layer_mode, ignore_index, class_weights, schedule, bpd_target, 
-                                beta_max, cov_mode, standard_reparam, learned_variance, min_log_sigma)
+    loss_fn = get_loss_function(loss_name, layer_mode, ignore_index, class_weights)
 
     optim_cls = getattr(torch.optim, cfg["optim"]["algo"])
-    base = dict(cfg["optim"]["params"])              # e.g., {"lr": 3e-4, "weight_decay": 0.01, ...}
+    base = dict(cfg["optim"]["params"])
 
     # group 1: model params, untouched
     groups = [{"params": model.parameters(), **base}]
@@ -336,7 +309,6 @@ def train_model(
     num_input_dims = sample.ndim
     total_epochs = cfg["nepochs"]
     max_norm = cfg["optim"].get("max_norm")
-    is_elbo = isinstance(loss_fn, (ELBOLoss, ComplexELBOLoss))
 
     # Use custom checkpoint if gumbel_experiment is provided
     if gumbel_experiment is not None:
@@ -360,12 +332,6 @@ def train_model(
             warmup_scheduler=warmup_scheduler,
             scheduler=scheduler,
         )
-    if is_elbo:
-        anneal = KLAnnealing(kind="linear", warmup_steps=15 * len(train_loader))
-        # run kl sanity checks
-        kl_sanity_checks()
-    else:
-        anneal = None
 
     history = defaultdict(list)
 
@@ -397,7 +363,6 @@ def train_model(
             optimizer=optimizer,
             loss_fn=loss_fn,
             device=device,
-            anneal=anneal,
             warmup_scheduler=current_warmup_scheduler,
             step_on_batch=step_on_batch,
             max_norm=max_norm,
@@ -407,7 +372,6 @@ def train_model(
             valid_loader=valid_loader,
             loss_fn=loss_fn,
             device=device,
-            anneal=anneal,
         )
 
         # 2. Extract loss specifically for history and schedulers

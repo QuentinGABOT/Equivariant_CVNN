@@ -196,13 +196,6 @@ def get_loss_function(
     layer_mode: str,
     ignore_index: Optional[int] = None,
     class_weights: Optional[np.ndarray] = None,
-    schedule: Optional[str] = None,
-    bpd_target: float = 0.20,
-    beta_max: float = 1.0,
-    cov_mode: str = "diag",
-    standard_reparam: bool = False,
-    learned_variance: bool = False,
-    min_log_sigma: Optional[float] = None,
 ) -> nn.Module:
     """Get appropriate loss function based on layer mode.
 
@@ -286,9 +279,6 @@ def get_loss_function(
                     "FocalLoss"
                 ]:
                     return loss_cls(ignore_index=ignore_index, weight=class_weights)
-                elif loss_name in ["ELBOLoss"]:
-                    return loss_cls(schedule=schedule, bpd_target=bpd_target, beta_max=beta_max, cov_mode=cov_mode,
-                                    learned_variance=learned_variance, min_log_sigma=min_log_sigma)
             except (ImportError, AttributeError):
                 raise ValueError(
                     f"Real loss '{real_loss_name}' not found in torch.nn or cvnn.losses"
@@ -312,9 +302,6 @@ def get_loss_function(
                     "FocalLoss",
                 ]:
                     return loss_cls(ignore_index=ignore_index, weight=class_weights)
-                elif loss_name in ["ELBOLoss"]:
-                    return loss_cls(schedule=schedule, bpd_target=bpd_target, beta_max=beta_max, cov_mode=cov_mode,
-                                    standard_reparam=standard_reparam, learned_variance=learned_variance, min_log_sigma=min_log_sigma)
                 else:
                     return loss_cls()
             except (ImportError, AttributeError):
